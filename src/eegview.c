@@ -200,7 +200,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	char *filename;
 	char tmpstr[64];
 	int j;
-	BDFChannel chann;
+	BDFChannel chann = {0};
 
 	filename =
 	    eegpanel_open_filename_dialog(panel, "*.bdf",
@@ -330,6 +330,7 @@ int main(int argc, char* argv[])
 	panel->user_data = panel;
 	panel->system_connection = SystemConnection;
 	panel->setup_recording = SetupRecording;
+	panel->stop_recording = StopRecording;
 
 	// Run the panel
 	eegpanel_show(panel, 1);
