@@ -6,6 +6,10 @@
 #include <pthread.h>
 #include <bdffile.h>
 
+#if HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 
 /**************************************************************************
  *                                                                        *
@@ -44,6 +48,7 @@ const struct channel_option* exg_opt = eeg_options+1;
  *                                                                        * 
  **************************************************************************/
 pthread_t thread_id;
+pthread_mutex_t rec_mtx = PTHREAD_MUTEX_INITIALIZER;
 BDFFile* bdffile = NULL;
 volatile int run_eeg = 0;
 volatile int record_file = 0;
@@ -107,10 +112,19 @@ void* reading_thread(void* arg)
 	ActivetwoStartBufferedAcquisition();
 	while(run_eeg) {
 		if (ActivetwoGetBufferedSamples(NSAMPLES, tri, raweeg, rawexg)==SUCCESS) {
+			// Write samples on file
+			pthread_mutex_lock(&rec_mtx);
+			if (record_file) {
+				WriteTypedDataBDFFile(bdffile, raweeg, rawexg, tri, NSAMPLES);
+			}
+			pthread_mutex_unlock(&rec_mtx);
+
+			// Scale data for panel
 			Act2ScaleArray(float, eeg, int32_t, raweeg, NSAMPLES*neeg, ACTIVE_ELEC_SCALE);
 			Act2ScaleArray(float, exg, int32_t, rawexg, NSAMPLES*nexg, ACTIVE_ELEC_SCALE);
 			Act2ScaleArray(uint32_t, tri, uint32_t, tri, NSAMPLES, TRIGGER_SCALE);
 		
+
 			eegpanel_add_samples(panel, eeg, exg, tri, NSAMPLES);
 		}
 	}
@@ -142,6 +156,8 @@ int Connect(EEGPanel* panel)
 		ActivetwoDisconnectFromSystem();
 		return retval;
 	}
+
+	// Setup the panel with the settings
 	eegpanel_define_input(panel, eeg_opt->numch, exg_opt->numch, 16, info.samplerate);
 
 	run_eeg = 1;
@@ -230,7 +246,25 @@ abort:
 	return 0;
 }
 
+int StopRecording(void* user_data)
+{
+	pthread_mutex_lock(&rec_mtx);
+	record_file = 0;
+	pthread_mutex_unlock(&rec_mtx);
+	
+	CloseBDFFile(bdffile);
+		
+	bdffile = NULL;
+	return 1;
+}
 
+int ToggleRecording(int start, void* user_data)
+{
+	pthread_mutex_lock(&rec_mtx);
+	record_file = start;
+	pthread_mutex_unlock(&rec_mtx);
+	return 1;
+}
 
 /**************************************************************************
  *                                                                        *
@@ -264,7 +298,7 @@ int main(int argc, char* argv[])
 		}
 
 		if (strcmp(argv[i],"--version")==0) {
-			printf("%s: version ??? build on\n\t%s\n\t%s\n",argv[0],ActivetwoGetString(),BDFFileGetString());
+			printf("%s: version %s build on\n\t%s\n\t%s\n",argv[0], PACKAGE_VERSION, ActivetwoGetString(),BDFFileGetString());
 			return 0;
 		}
 
@@ -275,7 +309,10 @@ int main(int argc, char* argv[])
 			retval = 1;
 		}
 
-		printf("Usage: %s [GTK+ OPTIONS...] [--settings=FILE] [--map-file=FILE] [--ui-file=FILE] [--eeg-set=EEG_SET] [--exg-set=EXG_SET] [--version]\n",argv[0]);
+		printf("Usage: %s [GTK+ OPTIONS...]\n"
+		       "	    [--settings=FILE] [--map-file=FILE]\n"
+		       "            [--ui-file=FILE] [--eeg-set=EEG_SET]\n"
+		       "            [--exg-set=EXG_SET] [--version]\n",argv[0]);
 
 		return retval;
 	}
