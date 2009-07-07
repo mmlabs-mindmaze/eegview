@@ -28,17 +28,17 @@ struct channel_option eeg_options[] = {
 	{AB, "AB", 64},
 	{AD, "AD", 128}
 };
-#define NUM_EEG_OPTION (sizeof(eeg_options)/sizeof(eeg_options[0]))
+#define NUM_EEG_OPTS (sizeof(eeg_options)/sizeof(eeg_options[0]))
 
 struct channel_option exg_options[] = {
 	{ALLEXG, "all", -1},
 	{STD, "STD", 8},
 	{NONE, "none", 0}
 };
-#define NUM_EXG_OPTION (sizeof(exg_options)/sizeof(exg_options[0]))
+#define NUM_EXG_OPTS (sizeof(exg_options)/sizeof(exg_options[0]))
 
 const struct channel_option* eeg_opt = eeg_options+2;
-const struct channel_option* exg_opt = eeg_options+1;
+const struct channel_option* exg_opt = exg_options+1;
 
 
 
@@ -152,7 +152,7 @@ int Connect(EEGPanel* panel)
 	
 
 	// Set the acquisition according to the settings
-	if ((retval = ActivetwoSetDataFormats(eeg_opt->numch, exg_opt->numch))!=SUCCESS) {
+	if ((retval = ActivetwoSetDataFormats(eeg_opt->type, exg_opt->type))!=SUCCESS) {
 		ActivetwoDisconnectFromSystem();
 		return retval;
 	}
@@ -280,6 +280,22 @@ const char* opt_str[] = {
 };
 #define NUM_OPTS	(sizeof(opt_str)/sizeof(opt_str[0]))
 
+const struct channel_option* find_chann_opt(const struct channel_option options[], unsigned int num_opt, const char* string)
+{
+	int i;
+	const struct channel_option* chann_opt = NULL;
+
+	for (i=0; i<num_opt; i++) {
+		if (strcmp(options[i].string, string)==0) {
+			chann_opt = options + i;
+			break;
+		}
+	}
+
+	return chann_opt;
+}
+
+
 int main(int argc, char* argv[])
 {
 	EEGPanel* panel;
@@ -296,19 +312,24 @@ int main(int argc, char* argv[])
 				break;
 			}
 		}
+		// The option has been found so move to the next 
+		if (iopt<NUM_OPTS)
+			continue;
 
+		// Print version of software and its dependencies
 		if (strcmp(argv[i],"--version")==0) {
 			printf("%s: version %s build on\n\t%s\n\t%s\n",argv[0], PACKAGE_VERSION, ActivetwoGetString(),BDFFileGetString());
 			return 0;
 		}
 
+		// Print usage string in case of unknown option
+		// or if "--help" or "-h" is provided
 		if ( (iopt == NUM_OPTS)
 		     && (strcmp(argv[i], "--help")!=0)
 		     && (strcmp(argv[i], "-h")!=0) ) {
 		     	fprintf(stderr, "Unknown option\n");
 			retval = 1;
 		}
-
 		printf("Usage: %s [GTK+ OPTIONS...]\n"
 		       "	    [--settings=FILE] [--map-file=FILE]\n"
 		       "            [--ui-file=FILE] [--eeg-set=EEG_SET]\n"
@@ -317,7 +338,23 @@ int main(int argc, char* argv[])
 		return retval;
 	}
 	
-
+	// Process EEG channels specification
+	if (opt_vals[3]) {
+		eeg_opt = find_chann_opt(eeg_options, NUM_EEG_OPTS, opt_vals[3]);
+		if (!eeg_opt) {
+			fprintf(stderr, "invalid option for EEG (%s)\n",opt_vals[3]);
+			return 1;
+		}
+	}
+	
+	// Process EXG channels specification
+	if (opt_vals[4]) {
+		exg_opt = find_chann_opt(eeg_options, NUM_EEG_OPTS, opt_vals[4]);
+		if (!exg_opt) {
+			fprintf(stderr, "invalid option for EXG (%s)\n",opt_vals[4]);
+			return 1;
+		}
+	}
 	
 
 	panel = eegpanel_create(opt_vals[1], opt_vals[0]);
