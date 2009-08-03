@@ -372,6 +372,7 @@ int main(int argc, char* argv[])
 	panel->system_connection = SystemConnection;
 	panel->setup_recording = SetupRecording;
 	panel->stop_recording = StopRecording;
+	panel->toggle_recording = ToggleRecording;
 
 	// Run the panel
 	eegpanel_show(panel, 1);
