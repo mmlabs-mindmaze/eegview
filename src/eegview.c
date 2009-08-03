@@ -99,6 +99,7 @@ void* reading_thread(void* arg)
 	int32_t *raweeg, *rawexg;
 	EEGPanel* panel = arg;
 	unsigned int neeg, nexg;
+	ActivetwoRetCode ret;
 
 	neeg = eeg_opt->numch;
 	nexg = exg_opt->numch;
@@ -111,7 +112,8 @@ void* reading_thread(void* arg)
 	
 	ActivetwoStartBufferedAcquisition();
 	while(run_eeg) {
-		if (ActivetwoGetBufferedSamples(NSAMPLES, tri, raweeg, rawexg)==SUCCESS) {
+		ret = ActivetwoGetBufferedSamples(NSAMPLES, tri, raweeg, rawexg);
+		if (ret ==SUCCESS) {
 			// Write samples on file
 			pthread_mutex_lock(&rec_mtx);
 			if (record_file) {
@@ -126,6 +128,8 @@ void* reading_thread(void* arg)
 		
 
 			eegpanel_add_samples(panel, eeg, exg, tri, NSAMPLES);
+		} else {
+			fprintf(stderr, "%s\n",get_acq_message(ret));
 		}
 	}
 	ActivetwoStopBufferedAcquisition();
@@ -349,7 +353,7 @@ int main(int argc, char* argv[])
 	
 	// Process EXG channels specification
 	if (opt_vals[4]) {
-		exg_opt = find_chann_opt(eeg_options, NUM_EEG_OPTS, opt_vals[4]);
+		exg_opt = find_chann_opt(exg_options, NUM_EXG_OPTS, opt_vals[4]);
 		if (!exg_opt) {
 			fprintf(stderr, "invalid option for EXG (%s)\n",opt_vals[4]);
 			return 1;
