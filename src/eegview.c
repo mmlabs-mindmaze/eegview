@@ -306,6 +306,7 @@ int main(int argc, char* argv[])
 	int i, iopt;
 	int retval = 0;
 	const char* opt_vals[NUM_OPTS] = {NULL};
+	struct PanelCb cb;
 
 	// Process command line options
 	init_eegpanel_lib(&argc, &argv);
@@ -360,20 +361,21 @@ int main(int argc, char* argv[])
 		}
 	}
 	
+	// Setup callbacks
+	memset(&cb, 0, sizeof(cb));
+	cb.user_data = panel;
+	cb.system_connection = SystemConnection;
+	cb.setup_recording = SetupRecording;
+	cb.stop_recording = StopRecording;
+	cb.toggle_recording = ToggleRecording;
 
-	panel = eegpanel_create(opt_vals[1], opt_vals[0]);
+
+	panel = eegpanel_create(opt_vals[1], opt_vals[0], &cb);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
 		return 2;
 	}
 	
-	// Setup callbacks
-	panel->user_data = panel;
-	panel->system_connection = SystemConnection;
-	panel->setup_recording = SetupRecording;
-	panel->stop_recording = StopRecording;
-	panel->toggle_recording = ToggleRecording;
-
 	// Run the panel
 	eegpanel_show(panel, 1);
 	eegpanel_run(panel, 0);
