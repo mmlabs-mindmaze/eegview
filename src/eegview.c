@@ -48,10 +48,10 @@ const struct channel_option* exg_opt = exg_options+1;
  *                                                                        * 
  **************************************************************************/
 pthread_t thread_id;
-pthread_mutex_t rec_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
 BDFFile* bdffile = NULL;
 volatile int run_eeg = 0;
-volatile int record_file = 0;
+int record_file = 0;
 #define NSAMPLES	32
 ActivetwoSystemInfo info;
 
@@ -100,6 +100,7 @@ void* reading_thread(void* arg)
 	EEGPanel* panel = arg;
 	unsigned int neeg, nexg;
 	ActivetwoRetCode ret;
+	int run_acq, saving;
 
 	neeg = eeg_opt->numch;
 	nexg = exg_opt->numch;
@@ -111,26 +112,36 @@ void* reading_thread(void* arg)
 	rawexg = (int32_t*)exg;
 	
 	ActivetwoStartBufferedAcquisition();
-	while(run_eeg) {
+	while (1) {
+		// update control flags
+		pthread_mutex_lock(&sync_mtx);
+		run_acq = run_eeg;
+		saving = record_file;
+		pthread_mutex_unlock(&sync_mtx);
+
+		// Check the stop acquisition flag
+		if (!run_acq)
+			break;
+
+		// Get data from the system
 		ret = ActivetwoGetBufferedSamples(NSAMPLES, tri, raweeg, rawexg);
-		if (ret ==SUCCESS) {
-			// Write samples on file
-			pthread_mutex_lock(&rec_mtx);
-			if (record_file) {
-				WriteTypedDataBDFFile(bdffile, raweeg, rawexg, tri, NSAMPLES);
-			}
-			pthread_mutex_unlock(&rec_mtx);
-
-			// Scale data for panel
-			Act2ScaleArray(float, eeg, int32_t, raweeg, NSAMPLES*neeg, ACTIVE_ELEC_SCALE);
-			Act2ScaleArray(float, exg, int32_t, rawexg, NSAMPLES*nexg, ACTIVE_ELEC_SCALE);
-			Act2ScaleArray(uint32_t, tri, uint32_t, tri, NSAMPLES, TRIGGER_SCALE);
-		
-
-			eegpanel_add_samples(panel, eeg, exg, tri, NSAMPLES);
-		} else {
-			fprintf(stderr, "%s\n",get_acq_message(ret));
+		if (ret != SUCCESS) {
+			eegpanel_popup_message(panel, get_acq_message(ret));
+			continue;
 		}
+
+		// Write samples on file
+		if (saving) {
+			if (WriteTypedDataBDFFile(bdffile, raweeg, rawexg, tri, NSAMPLES))
+				fprintf(stderr, "%s\n", get_bdf_message());
+		}
+
+		// Scale data for panel
+		Act2ScaleArray(float, eeg, int32_t, raweeg, NSAMPLES*neeg, ACTIVE_ELEC_SCALE);
+		Act2ScaleArray(float, exg, int32_t, rawexg, NSAMPLES*nexg, ACTIVE_ELEC_SCALE);
+		Act2ScaleArray(uint32_t, tri, uint32_t, tri, NSAMPLES, TRIGGER_SCALE);
+		
+		eegpanel_add_samples(panel, eeg, exg, tri, NSAMPLES);
 	}
 	ActivetwoStopBufferedAcquisition();
 
@@ -173,7 +184,10 @@ int Connect(EEGPanel* panel)
 
 int Disconnect(EEGPanel* panel)
 {
+	pthread_mutex_lock(&sync_mtx);
 	run_eeg = 0;
+	pthread_mutex_unlock(&sync_mtx);
+
 	pthread_join(thread_id, NULL);
 	ActivetwoDisconnectFromSystem();
 	return 0;
@@ -252,9 +266,9 @@ abort:
 
 int StopRecording(void* user_data)
 {
-	pthread_mutex_lock(&rec_mtx);
+	pthread_mutex_lock(&sync_mtx);
 	record_file = 0;
-	pthread_mutex_unlock(&rec_mtx);
+	pthread_mutex_unlock(&sync_mtx);
 	
 	CloseBDFFile(bdffile);
 		
@@ -264,9 +278,9 @@ int StopRecording(void* user_data)
 
 int ToggleRecording(int start, void* user_data)
 {
-	pthread_mutex_lock(&rec_mtx);
+	pthread_mutex_lock(&sync_mtx);
 	record_file = start;
-	pthread_mutex_unlock(&rec_mtx);
+	pthread_mutex_unlock(&sync_mtx);
 	return 1;
 }
 
