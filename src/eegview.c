@@ -242,7 +242,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 		if (AddBDFChannel(bdffile, &chann) < 1)
 			goto abort;
 	}
-	for (j = 0; j < eeg_opt->numch; j++) {
+	for (j = 0; j < exg_opt->numch; j++) {
 		sprintf(tmpstr, "EXG%i", j);
 		SetBDFChannel(&chann, BDF_CHANNEL_EXG, tmpstr);
 		if (AddBDFChannel(bdffile, &chann) < 1)
