@@ -127,7 +127,7 @@ void* reading_thread(void* arg)
 		ret = ActivetwoGetBufferedSamples(NSAMPLES, tri, raweeg, rawexg);
 		if (ret != SUCCESS) {
 			eegpanel_popup_message(panel, get_acq_message(ret));
-			continue;
+			break;
 		}
 
 		// Write samples on file
