@@ -316,7 +316,7 @@ const struct channel_option* find_chann_opt(const struct channel_option options[
 
 int main(int argc, char* argv[])
 {
-	EEGPanel* panel;
+	EEGPanel* panel = NULL;
 	int i, iopt;
 	int retval = 0;
 	const char* opt_vals[NUM_OPTS] = {NULL};
@@ -377,7 +377,7 @@ int main(int argc, char* argv[])
 	
 	// Setup callbacks
 	memset(&cb, 0, sizeof(cb));
-	cb.user_data = panel;
+	cb.user_data = NULL;
 	cb.system_connection = SystemConnection;
 	cb.setup_recording = SetupRecording;
 	cb.stop_recording = StopRecording;
