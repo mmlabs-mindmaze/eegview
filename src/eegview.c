@@ -321,6 +321,9 @@ int main(int argc, char* argv[])
 	int retval = 0;
 	const char* opt_vals[NUM_OPTS] = {NULL};
 	struct PanelCb cb;
+	struct PanelSettings settings = {
+		.uifilename = NULL
+	};
 
 	// Process command line options
 	init_eegpanel_lib(&argc, &argv);
@@ -383,8 +386,8 @@ int main(int argc, char* argv[])
 	cb.stop_recording = StopRecording;
 	cb.toggle_recording = ToggleRecording;
 
-
-	panel = eegpanel_create(opt_vals[1], opt_vals[0], &cb);
+	settings.uifilename = opt_vals[1];
+	panel = eegpanel_create(&settings, &cb);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
 		return 2;
