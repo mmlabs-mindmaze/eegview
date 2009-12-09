@@ -10,6 +10,7 @@
 # include <config.h>
 #endif
 
+#include "configuration.h"
 
 /**************************************************************************
  *                                                                        *
@@ -54,6 +55,9 @@ volatile int run_eeg = 0;
 int record_file = 0;
 #define NSAMPLES	32
 ActivetwoSystemInfo info;
+struct PanelSettings settings = {
+	.uifilename = NULL
+};
 
 /**************************************************************************
  *                                                                        *
@@ -237,13 +241,24 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	// Set up the channels
 	SetSamplingRateBDFFile(bdffile, info.samplerate);
 	for (j = 0; j < eeg_opt->numch; j++) {
-		sprintf(tmpstr, "EEG%i", j);
+		// Use labels for channel if available
+		if (settings.eeglabels && settings.num_eeg < j)
+			strncpy(tmpstr, settings.eeglabels[j], sizeof(tmpstr)-1);
+		else
+			sprintf(tmpstr, "EEG%i", j);
+
+		// Add the channel to the BDF
 		SetBDFChannel(&chann, BDF_CHANNEL_EEG, tmpstr);
 		if (AddBDFChannel(bdffile, &chann) < 1)
 			goto abort;
 	}
-	for (j = 0; j < exg_opt->numch; j++) {
-		sprintf(tmpstr, "EXG%i", j);
+	for (j = 0; j < eeg_opt->numch; j++) {
+		// Use labels for channel if available
+		if (settings.sensorlabels && settings.num_sensor < j)
+			strncpy(tmpstr, settings.sensorlabels[j], sizeof(tmpstr)-1);
+		else
+			sprintf(tmpstr, "EXG%i", j);
+
 		SetBDFChannel(&chann, BDF_CHANNEL_EXG, tmpstr);
 		if (AddBDFChannel(bdffile, &chann) < 1)
 			goto abort;
@@ -320,9 +335,12 @@ int main(int argc, char* argv[])
 	int i, iopt;
 	int retval = 0;
 	const char* opt_vals[NUM_OPTS] = {NULL};
-	struct PanelCb cb;
-	struct PanelSettings settings = {
-		.uifilename = NULL
+	struct PanelCb cb = {
+		.user_data = NULL,
+		.system_connection = SystemConnection,
+		.setup_recording = SetupRecording,
+		.stop_recording = StopRecording,
+		.toggle_recording = ToggleRecording,
 	};
 
 	// Process command line options
@@ -378,6 +396,7 @@ int main(int argc, char* argv[])
 		}
 	}
 	
+<<<<<<< HEAD:src/eegview.c
 	// Setup callbacks
 	memset(&cb, 0, sizeof(cb));
 	cb.user_data = NULL;
@@ -385,6 +404,10 @@ int main(int argc, char* argv[])
 	cb.setup_recording = SetupRecording;
 	cb.stop_recording = StopRecording;
 	cb.toggle_recording = ToggleRecording;
+=======
+	read_configuration(&settings, eeg_opt->string, exg_opt->string);
+
+>>>>>>> Add configuration file:src/eegview.c
 
 	settings.uifilename = opt_vals[1];
 	panel = eegpanel_create(&settings, &cb);
@@ -399,6 +422,7 @@ int main(int argc, char* argv[])
 
 
 	eegpanel_destroy(panel);
+	free_configuration(&settings);
 
 	return 0;
 }
