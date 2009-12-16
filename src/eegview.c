@@ -51,7 +51,7 @@ const struct channel_option* exg_opt = exg_options+1;
 pthread_t thread_id;
 pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
 BDFFile* bdffile = NULL;
-volatile int run_eeg = 0;
+int run_eeg = 0;
 int record_file = 0;
 #define NSAMPLES	32
 ActivetwoSystemInfo info;
@@ -59,6 +59,7 @@ struct PanelSettings settings = {
 	.uifilename = NULL
 };
 
+int StopRecording(void* user_data);
 /**************************************************************************
  *                                                                        *
  *              Error message helper functions                            *
@@ -95,6 +96,15 @@ const char* get_bdf_message(void)
  *              Acquition system callbacks                                *
  *                                                                        * 
  **************************************************************************/
+void* display_bdf_error(void* arg)
+{
+	EEGPanel* pan = arg;
+
+	eegpanel_popup_message(pan, get_bdf_message());
+
+	return NULL;
+}
+
 // EEG acquisition thread
 void* reading_thread(void* arg)
 {
@@ -130,14 +140,24 @@ void* reading_thread(void* arg)
 		// Get data from the system
 		ret = ActivetwoGetBufferedSamples(NSAMPLES, tri, raweeg, rawexg);
 		if (ret != SUCCESS) {
+			eegpanel_notify(panel, DISCONNECTED);
 			eegpanel_popup_message(panel, get_acq_message(ret));
 			break;
 		}
 
 		// Write samples on file
 		if (saving) {
-			if (WriteTypedDataBDFFile(bdffile, raweeg, rawexg, tri, NSAMPLES))
-				fprintf(stderr, "%s\n", get_bdf_message());
+			if (WriteTypedDataBDFFile(bdffile, raweeg, rawexg, tri, NSAMPLES)) {
+				pthread_attr_t attr;
+				pthread_t thid;
+			
+				StopRecording(NULL);
+
+				pthread_attr_init(&attr);
+				pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+				pthread_create(&thid, &attr, display_bdf_error, panel);
+				pthread_attr_destroy(&attr);
+			}
 		}
 
 		// Scale data for panel
@@ -225,8 +245,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	BDFChannel chann = {0};
 
 	filename =
-	    eegpanel_open_filename_dialog(panel, "*.bdf",
-					  "BDF files (*.bdf)");
+	    eegpanel_open_filename_dialog(panel, "BDF files|*.bdf|*.BDF||Any files|*");
 	
 	// Check that user hasn't press cancel
 	if (!filename)
@@ -245,7 +264,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 		if (settings.eeglabels && j<settings.num_eeg)
 			strncpy(tmpstr, settings.eeglabels[j], sizeof(tmpstr)-1);
 		else
-			sprintf(tmpstr, "EEG%i", j);
+			sprintf(tmpstr, "EEG%i", j+1);
 
 		// Add the channel to the BDF
 		SetBDFChannel(&chann, BDF_CHANNEL_EEG, tmpstr);
@@ -257,7 +276,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 		if (settings.sensorlabels && j<settings.num_sensor)
 			strncpy(tmpstr, settings.sensorlabels[j], sizeof(tmpstr)-1);
 		else
-			sprintf(tmpstr, "EXG%i", j);
+			sprintf(tmpstr, "EXG%i", j+1);
 
 		SetBDFChannel(&chann, BDF_CHANNEL_EXG, tmpstr);
 		if (AddBDFChannel(bdffile, &chann) < 1)
