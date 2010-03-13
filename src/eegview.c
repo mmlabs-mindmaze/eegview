@@ -286,6 +286,8 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	if (AddBDFChannel(bdffile, &chann) < 1)
 		goto abort;
 
+	SetTypedDataPropertiesBDFFile(bdffile, eeg_opt->numch, exg_opt->numch, 1);
+
 	// Make the file ready for recording
 	if(PrepareForTransfer(bdffile))
 		goto abort;
