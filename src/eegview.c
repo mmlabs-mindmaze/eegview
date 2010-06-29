@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include <bdffile.h>
+#include <xdfio.h>
+#include <errno.h>
 
 #if HAVE_CONFIG_H
 # include <config.h>
@@ -20,7 +21,7 @@
 struct channel_option {
 	int type;
 	const char* string;
-	int numch;
+	unsigned int numch;
 };
 
 struct channel_option eeg_options[] = {
@@ -50,7 +51,7 @@ const struct channel_option* exg_opt = exg_options+1;
  **************************************************************************/
 pthread_t thread_id;
 pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
-BDFFile* bdffile = NULL;
+struct xdf* xdf = NULL;
 int run_eeg = 0;
 int record_file = 0;
 #define NSAMPLES	32
@@ -76,21 +77,14 @@ static char* const  acquisition_system_message[] = {
 
 const char* get_acq_message(ActivetwoRetCode retcode)
 {
-	int msg_ind  = SUCCESS - retcode -1;
+	unsigned int msg_ind  = SUCCESS - retcode -1;
 
 	if (msg_ind > NUM_SYS_MESSAGE)
 		return "Unknown error.";
-	return acquisition_system_message[SUCCESS - retcode -1];
+	return acquisition_system_message[msg_ind];
 }
 
 static char bdffile_message[128];
-const char* get_bdf_message(void)
-{
-	sprintf(bdffile_message,"BDF Error (%i)",BDFGetLastError());
-
-	return bdffile_message;
-}
-
 /**************************************************************************
  *                                                                        *
  *              Acquition system callbacks                                *
@@ -100,7 +94,7 @@ void* display_bdf_error(void* arg)
 {
 	EEGPanel* pan = arg;
 
-	eegpanel_popup_message(pan, get_bdf_message());
+	eegpanel_popup_message(pan, bdffile_message);
 
 	return NULL;
 }
@@ -145,14 +139,19 @@ void* reading_thread(void* arg)
 			break;
 		}
 
+		// Scale data
+		Act2ScaleArray(float, eeg, int32_t, raweeg, NSAMPLES*neeg, ACTIVE_ELEC_SCALE);
+		Act2ScaleArray(float, exg, int32_t, rawexg, NSAMPLES*nexg, ACTIVE_ELEC_SCALE);
+		Act2ScaleArray(uint32_t, tri, uint32_t, tri, NSAMPLES, TRIGGER_SCALE);
+
 		// Write samples on file
 		if (saving) {
-			if (WriteTypedDataBDFFile(bdffile, raweeg, rawexg, tri, NSAMPLES)) {
+			if (xdf_write(xdf, NSAMPLES, eeg, exg, tri) < 0) {
 				pthread_attr_t attr;
 				pthread_t thid;
 			
 				StopRecording(NULL);
-
+				sprintf(bdffile_message,"XDF Error: %s",strerror(errno));
 				pthread_attr_init(&attr);
 				pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 				pthread_create(&thid, &attr, display_bdf_error, panel);
@@ -160,10 +159,6 @@ void* reading_thread(void* arg)
 			}
 		}
 
-		// Scale data for panel
-		Act2ScaleArray(float, eeg, int32_t, raweeg, NSAMPLES*neeg, ACTIVE_ELEC_SCALE);
-		Act2ScaleArray(float, exg, int32_t, rawexg, NSAMPLES*nexg, ACTIVE_ELEC_SCALE);
-		Act2ScaleArray(uint32_t, tri, uint32_t, tri, NSAMPLES, TRIGGER_SCALE);
 		
 		eegpanel_add_samples(panel, eeg, exg, tri, NSAMPLES);
 	}
@@ -208,6 +203,8 @@ int Connect(EEGPanel* panel)
 
 int Disconnect(EEGPanel* panel)
 {
+	(void)panel;
+
 	pthread_mutex_lock(&sync_mtx);
 	run_eeg = 0;
 	pthread_mutex_unlock(&sync_mtx);
@@ -238,11 +235,16 @@ int SystemConnection(int start, void* user_data)
 int SetupRecording(const ChannelSelection * eeg_sel,
 		   const ChannelSelection * exg_sel, void *user_data)
 {
+	(void)eeg_sel;
+	(void)exg_sel;
 	EEGPanel *panel = user_data;
 	char *filename;
 	char tmpstr[64];
-	int j;
-	BDFChannel chann = {0};
+	unsigned int j;
+	struct xdfch* ch;
+	unsigned int arrstrides[3] = {eeg_opt->numch*sizeof(float),
+	                        exg_opt->numch*sizeof(float),
+				sizeof(uint32_t)};
 
 	filename =
 	    eegpanel_open_filename_dialog(panel, "BDF files|*.bdf|*.BDF||Any files|*");
@@ -252,13 +254,16 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 		return 0;
 
 	// Create the BDF file
-	bdffile = OpenBDFFile(filename, BDF_MODE_WRITE);
-	if (!bdffile) 
+	xdf = xdf_open(filename, XDF_WRITE, XDF_BDF);
+	if (!xdf) 
 		goto abort;
 
 
 	// Set up the channels
-	SetSamplingRateBDFFile(bdffile, info.samplerate);
+	xdf_set_conf(xdf,
+	             XDF_FIELD_RECORD_DURATION, 1.0,
+	             XDF_FIELD_NSAMPLE_PER_RECORD, info.samplerate,
+		     XDF_FIELD_NONE);
 	for (j = 0; j < eeg_opt->numch; j++) {
 		// Use labels for channel if available
 		if (settings.eeglabels && j<settings.num_eeg)
@@ -267,9 +272,24 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 			sprintf(tmpstr, "EEG%i", j+1);
 
 		// Add the channel to the BDF
-		SetBDFChannel(&chann, BDF_CHANNEL_EEG, tmpstr);
-		if (AddBDFChannel(bdffile, &chann) < 1)
+		if ((ch = xdf_add_channel(xdf)) == NULL)
 			goto abort;
+
+		xdf_set_chconf(ch, 
+		               XDF_CHFIELD_ARRAY_INDEX, 0,
+			       XDF_CHFIELD_ARRAY_OFFSET, j*sizeof(float),
+			       XDF_CHFIELD_ARRAY_DIGITAL, 0,
+			       XDF_CHFIELD_ARRAY_TYPE, XDFFLOAT,
+			       XDF_CHFIELD_LABEL, tmpstr,
+			       XDF_CHFIELD_PHYSICAL_MIN, -262144.0,
+			       XDF_CHFIELD_PHYSICAL_MAX, 262143.0,
+			       XDF_CHFIELD_DIGITAL_MIN, -8388608.0,
+			       XDF_CHFIELD_DIGITAL_MAX, 8388607.0,
+			       XDF_CHFIELD_PREFILTERING, "HP: DC; LP: 417 Hz",
+			       XDF_CHFIELD_TRANSDUCTER, "Active Electrode",
+			       XDF_CHFIELD_UNIT, "uV",
+			       XDF_CHFIELD_RESERVED, "EEG",
+			       XDF_CHFIELD_NONE);
 	}
 	for (j = 0; j < exg_opt->numch; j++) {
 		// Use labels for channel if available
@@ -278,42 +298,76 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 		else
 			sprintf(tmpstr, "EXG%i", j+1);
 
-		SetBDFChannel(&chann, BDF_CHANNEL_EXG, tmpstr);
-		if (AddBDFChannel(bdffile, &chann) < 1)
+		// Add the channel to the BDF
+		if ((ch = xdf_add_channel(xdf)) == NULL)
 			goto abort;
+
+		xdf_set_chconf(ch, 
+		               XDF_CHFIELD_ARRAY_INDEX, 1,
+			       XDF_CHFIELD_ARRAY_OFFSET, j*sizeof(float),
+			       XDF_CHFIELD_ARRAY_DIGITAL, 0,
+			       XDF_CHFIELD_ARRAY_TYPE, XDFFLOAT,
+			       XDF_CHFIELD_LABEL, tmpstr,
+			       XDF_CHFIELD_PHYSICAL_MIN, -262144.0,
+			       XDF_CHFIELD_PHYSICAL_MAX, 262143.0,
+			       XDF_CHFIELD_DIGITAL_MIN, -8388608.0,
+			       XDF_CHFIELD_DIGITAL_MAX, 8388607.0,
+			       XDF_CHFIELD_PREFILTERING, "HP: DC; LP: 417 Hz",
+			       XDF_CHFIELD_TRANSDUCTER, "Active Electrode",
+			       XDF_CHFIELD_UNIT, "uV",
+			       XDF_CHFIELD_RESERVED, "EXG",
+			       XDF_CHFIELD_NONE);
 	}
-	SetBDFChannel(&chann, BDF_CHANNEL_TRIGG, "Status");
-	if (AddBDFChannel(bdffile, &chann) < 1)
+
+	// Add the status to the BDF
+	if ((ch = xdf_add_channel(xdf)) == NULL)
 		goto abort;
 
-	SetTypedDataPropertiesBDFFile(bdffile, eeg_opt->numch, exg_opt->numch, 1);
+	xdf_set_chconf(ch, 
+	               XDF_CHFIELD_ARRAY_INDEX, 2,
+		       XDF_CHFIELD_ARRAY_OFFSET, 0,
+		       XDF_CHFIELD_ARRAY_DIGITAL, 0,
+		       XDF_CHFIELD_ARRAY_TYPE, XDFUINT32,
+		       XDF_CHFIELD_LABEL, "Status",
+		       XDF_CHFIELD_PHYSICAL_MIN, -8388608.0,
+		       XDF_CHFIELD_PHYSICAL_MAX, 8388607.0,
+		       XDF_CHFIELD_DIGITAL_MIN, -8388608.0,
+		       XDF_CHFIELD_DIGITAL_MAX, 8388607.0,
+		       XDF_CHFIELD_PREFILTERING, "No filtering",
+		       XDF_CHFIELD_TRANSDUCTER, "Triggers and Status",
+		       XDF_CHFIELD_UNIT, "Boolean",
+		       XDF_CHFIELD_RESERVED, "TRI",
+		       XDF_CHFIELD_NONE);
 
 	// Make the file ready for recording
-	if(PrepareForTransfer(bdffile))
+	xdf_define_arrays(xdf, 3, arrstrides);
+	if(xdf_prepare_transfer(xdf))
 		goto abort;
 
 	return 1;
 	
 abort:
-	eegpanel_popup_message(panel, get_bdf_message());
-	CloseBDFFile(bdffile);
+	sprintf(bdffile_message,"XDF Error: %s",strerror(errno));
+	eegpanel_popup_message(panel, bdffile_message);
+	xdf_close(xdf);
 	return 0;
 }
 
 int StopRecording(void* user_data)
 {
+	(void)user_data;
 	pthread_mutex_lock(&sync_mtx);
 	record_file = 0;
 	pthread_mutex_unlock(&sync_mtx);
 	
-	CloseBDFFile(bdffile);
-		
-	bdffile = NULL;
+	xdf_close(xdf);
+	xdf = NULL;
 	return 1;
 }
 
 int ToggleRecording(int start, void* user_data)
 {
+	(void)user_data;
 	pthread_mutex_lock(&sync_mtx);
 	record_file = start;
 	pthread_mutex_unlock(&sync_mtx);
@@ -336,7 +390,7 @@ const char* opt_str[] = {
 
 const struct channel_option* find_chann_opt(const struct channel_option options[], unsigned int num_opt, const char* string)
 {
-	int i;
+	unsigned int i;
 	const struct channel_option* chann_opt = NULL;
 
 	for (i=0; i<num_opt; i++) {
@@ -353,8 +407,8 @@ const struct channel_option* find_chann_opt(const struct channel_option options[
 int main(int argc, char* argv[])
 {
 	EEGPanel* panel = NULL;
-	int i, iopt;
-	int retval = 0;
+	int i, retval = 0;
+	unsigned int iopt;
 	const char* opt_vals[NUM_OPTS] = {NULL};
 	struct PanelCb cb = {
 		.user_data = NULL,
@@ -379,7 +433,7 @@ int main(int argc, char* argv[])
 
 		// Print version of software and its dependencies
 		if (strcmp(argv[i],"--version")==0) {
-			printf("%s: version %s build on\n\t%s\n\t%s\n",argv[0], PACKAGE_VERSION, ActivetwoGetString(),BDFFileGetString());
+			printf("%s: version %s build on\n\t%s\n\t%s\n",argv[0], PACKAGE_VERSION, ActivetwoGetString(),xdf_get_string());
 			return 0;
 		}
 

@@ -37,7 +37,7 @@ esac
 AC_SEARCH_LIBS([pthread_create], [pthread posix4], [], AC_MSG_ERROR([The pthread library must be installed. Consider the installation of pthreads-win32 if on windows platform.]))
 AC_SEARCH_LIBS([eegpanel_create], [eegpanel], [], AC_MSG_ERROR([The eegpanel library must be installed.]))
 AC_SEARCH_LIBS([ActivetwoConnectToSystem], [activetwo act2demux], [], AC_MSG_ERROR([The act2lib library must be installed.]))
-AC_SEARCH_LIBS([OpenBDFFile], [bdffileio], [], AC_MSG_ERROR([The bdffileio library must be installed.]))
+AC_SEARCH_LIBS([xdf_open], [xdffileio], [], AC_MSG_ERROR([The xdffileio library must be installed.]))
 AC_SEARCH_LIBS([cfg_parse], [confuse], [], AC_MSG_ERROR([The libconfuse library must be installed.]))
 
 AC_SUBST(AM_LDFLAGS)
