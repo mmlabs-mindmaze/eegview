@@ -18,20 +18,10 @@ AC_CANONICAL_BUILD
 AC_PROG_CC_C99
 AM_PROG_CC_C_O
 
-LT_INIT([win32-dll])
 AC_SUBST(LIBTOOL_DEPS)
 
 AC_HEADER_STDC
 AC_C_CONST
-
-
-os_support=other
-case $host in
-	*win32* | *mingw32* | *cygwin* | *windows*)
-		AM_LDFLAGS="$AM_LDFLAGS -no-undefined"
-		os_support=win32
-		;;
-esac
 
 
 AC_SEARCH_LIBS([pthread_create], [pthread posix4], [], AC_MSG_ERROR([The pthread library must be installed. Consider the installation of pthreads-win32 if on windows platform.]))
@@ -40,7 +30,6 @@ AC_SEARCH_LIBS([ActivetwoConnectToSystem], [activetwo act2demux], [], AC_MSG_ERR
 AC_SEARCH_LIBS([OpenBDFFile], [bdffileio], [], AC_MSG_ERROR([The bdffileio library must be installed.]))
 AC_SEARCH_LIBS([cfg_parse], [confuse], [], AC_MSG_ERROR([The libconfuse library must be installed.]))
 
-AC_SUBST(AM_LDFLAGS)
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
