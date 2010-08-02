@@ -261,9 +261,9 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 
 	// Set up the channels
 	xdf_set_conf(xdf,
-	             XDF_FIELD_RECORD_DURATION, 1.0,
-	             XDF_FIELD_NSAMPLE_PER_RECORD, info.samplerate,
-		     XDF_FIELD_NONE);
+	             XDF_F_REC_DURATION, 1.0,
+	             XDF_F_REC_NSAMPLE, info.samplerate,
+		     XDF_NOF);
 	for (j = 0; j < eeg_opt->numch; j++) {
 		// Use labels for channel if available
 		if (settings.eeglabels && j<settings.num_eeg)
@@ -272,24 +272,24 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 			sprintf(tmpstr, "EEG%i", j+1);
 
 		// Add the channel to the BDF
-		if ((ch = xdf_add_channel(xdf)) == NULL)
+		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
 			goto abort;
 
 		xdf_set_chconf(ch, 
-		               XDF_CHFIELD_ARRAY_INDEX, 0,
-			       XDF_CHFIELD_ARRAY_OFFSET, j*sizeof(float),
-			       XDF_CHFIELD_ARRAY_DIGITAL, 0,
-			       XDF_CHFIELD_ARRAY_TYPE, XDFFLOAT,
-			       XDF_CHFIELD_LABEL, tmpstr,
-			       XDF_CHFIELD_PHYSICAL_MIN, -262144.0,
-			       XDF_CHFIELD_PHYSICAL_MAX, 262143.0,
-			       XDF_CHFIELD_DIGITAL_MIN, -8388608.0,
-			       XDF_CHFIELD_DIGITAL_MAX, 8388607.0,
-			       XDF_CHFIELD_PREFILTERING, "HP: DC; LP: 417 Hz",
-			       XDF_CHFIELD_TRANSDUCTER, "Active Electrode",
-			       XDF_CHFIELD_UNIT, "uV",
-			       XDF_CHFIELD_RESERVED, "EEG",
-			       XDF_CHFIELD_NONE);
+		               XDF_CF_ARRINDEX, 0,
+			       XDF_CF_ARROFFSET, j*sizeof(float),
+			       XDF_CF_ARRDIGITAL, 0,
+			       XDF_CF_ARRTYPE, XDFFLOAT,
+			       XDF_CF_LABEL, tmpstr,
+			       XDF_CF_PMIN, -262144.0,
+			       XDF_CF_PMAX, 262143.0,
+			       XDF_CF_DMIN, -8388608.0,
+			       XDF_CF_DMAX, 8388607.0,
+			       XDF_CF_PREFILTERING, "HP: DC; LP: 417 Hz",
+			       XDF_CF_TRANSDUCTER, "Active Electrode",
+			       XDF_CF_UNIT, "uV",
+			       XDF_CF_RESERVED, "EEG",
+			       XDF_NOF);
 	}
 	for (j = 0; j < exg_opt->numch; j++) {
 		// Use labels for channel if available
@@ -299,45 +299,45 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 			sprintf(tmpstr, "EXG%i", j+1);
 
 		// Add the channel to the BDF
-		if ((ch = xdf_add_channel(xdf)) == NULL)
+		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
 			goto abort;
 
 		xdf_set_chconf(ch, 
-		               XDF_CHFIELD_ARRAY_INDEX, 1,
-			       XDF_CHFIELD_ARRAY_OFFSET, j*sizeof(float),
-			       XDF_CHFIELD_ARRAY_DIGITAL, 0,
-			       XDF_CHFIELD_ARRAY_TYPE, XDFFLOAT,
-			       XDF_CHFIELD_LABEL, tmpstr,
-			       XDF_CHFIELD_PHYSICAL_MIN, -262144.0,
-			       XDF_CHFIELD_PHYSICAL_MAX, 262143.0,
-			       XDF_CHFIELD_DIGITAL_MIN, -8388608.0,
-			       XDF_CHFIELD_DIGITAL_MAX, 8388607.0,
-			       XDF_CHFIELD_PREFILTERING, "HP: DC; LP: 417 Hz",
-			       XDF_CHFIELD_TRANSDUCTER, "Active Electrode",
-			       XDF_CHFIELD_UNIT, "uV",
-			       XDF_CHFIELD_RESERVED, "EXG",
-			       XDF_CHFIELD_NONE);
+		               XDF_CF_ARRINDEX, 1,
+			       XDF_CF_ARROFFSET, j*sizeof(float),
+			       XDF_CF_ARRDIGITAL, 0,
+			       XDF_CF_ARRTYPE, XDFFLOAT,
+			       XDF_CF_LABEL, tmpstr,
+			       XDF_CF_PMIN, -262144.0,
+			       XDF_CF_PMAX, 262143.0,
+			       XDF_CF_DMIN, -8388608.0,
+			       XDF_CF_DMAX, 8388607.0,
+			       XDF_CF_PREFILTERING, "HP: DC; LP: 417 Hz",
+			       XDF_CF_TRANSDUCTER, "Active Electrode",
+			       XDF_CF_UNIT, "uV",
+			       XDF_CF_RESERVED, "EXG",
+			       XDF_NOF);
 	}
 
 	// Add the status to the BDF
-	if ((ch = xdf_add_channel(xdf)) == NULL)
+	if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
 		goto abort;
 
 	xdf_set_chconf(ch, 
-	               XDF_CHFIELD_ARRAY_INDEX, 2,
-		       XDF_CHFIELD_ARRAY_OFFSET, 0,
-		       XDF_CHFIELD_ARRAY_DIGITAL, 0,
-		       XDF_CHFIELD_ARRAY_TYPE, XDFUINT32,
-		       XDF_CHFIELD_LABEL, "Status",
-		       XDF_CHFIELD_PHYSICAL_MIN, -8388608.0,
-		       XDF_CHFIELD_PHYSICAL_MAX, 8388607.0,
-		       XDF_CHFIELD_DIGITAL_MIN, -8388608.0,
-		       XDF_CHFIELD_DIGITAL_MAX, 8388607.0,
-		       XDF_CHFIELD_PREFILTERING, "No filtering",
-		       XDF_CHFIELD_TRANSDUCTER, "Triggers and Status",
-		       XDF_CHFIELD_UNIT, "Boolean",
-		       XDF_CHFIELD_RESERVED, "TRI",
-		       XDF_CHFIELD_NONE);
+	               XDF_CF_ARRINDEX, 2,
+		       XDF_CF_ARROFFSET, 0,
+		       XDF_CF_ARRDIGITAL, 0,
+		       XDF_CF_ARRTYPE, XDFUINT32,
+		       XDF_CF_LABEL, "Status",
+		       XDF_CF_PMIN, -8388608.0,
+		       XDF_CF_PMAX, 8388607.0,
+		       XDF_CF_DMIN, -8388608.0,
+		       XDF_CF_DMAX, 8388607.0,
+		       XDF_CF_PREFILTERING, "No filtering",
+		       XDF_CF_TRANSDUCTER, "Triggers and Status",
+		       XDF_CF_UNIT, "Boolean",
+		       XDF_CF_RESERVED, "TRI",
+		       XDF_NOF);
 
 	// Make the file ready for recording
 	xdf_define_arrays(xdf, 3, arrstrides);
