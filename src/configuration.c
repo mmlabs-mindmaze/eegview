@@ -76,9 +76,9 @@ int get_set_labels(cfg_t *cfg, char*** label_list)
 	return nchann;
 }
 
-int read_configuration(struct PanelSettings* settings, const char* eegset, const char* sensorset)
+int read_configuration(struct PanelSettings* settings, const char* eegset, const char* sensorset, const char* filename)
 {
-	char filename[256];
+	const char* setname;
 	int state;
 	double freq;
 	unsigned int nchann;
@@ -87,7 +87,6 @@ int read_configuration(struct PanelSettings* settings, const char* eegset, const
 
 	
 	setlocale(LC_NUMERIC, "POSIX");
-	sprintf(filename, "%s/.eegview", getenv("HOME"));
 
 	cfg = cfg_init(opts, 0);
 	cfg_parse(cfg, filename);
@@ -103,6 +102,11 @@ int read_configuration(struct PanelSettings* settings, const char* eegset, const
 	if (labels) {
 		settings->eeglabels = (const char**)labels;
 		settings->num_eeg = nchann;
+	}
+	nchann = get_set_labels(cfg_gettsec(cfg, "map", sensorset), &labels);
+	if (labels) {
+		settings->sensorlabels = (const char**)labels;
+		settings->num_sensor = nchann;
 	}
 	
 	cfg_free(cfg);

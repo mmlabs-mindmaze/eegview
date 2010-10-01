@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <eegpanel.h>
-#include <act2demux.h>
+#include <eegdev.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <xdfio.h>
 #include <errno.h>
+#include <getopt.h>
 
 #if HAVE_CONFIG_H
 # include <config.h>
@@ -18,30 +19,23 @@
  *              Channel selection structures                              *
  *                                                                        * 
  **************************************************************************/
-struct channel_option {
+/*struct channel_option {
 	int type;
 	const char* string;
 	unsigned int numch;
 };
 
 struct channel_option eeg_options[] = {
-	{ALLEEG, "all", -1},
-	{A, "A", 32},
-	{AB, "AB", 64},
-	{AD, "AD", 128}
 };
 #define NUM_EEG_OPTS (sizeof(eeg_options)/sizeof(eeg_options[0]))
 
 struct channel_option exg_options[] = {
-	{ALLEXG, "all", -1},
-	{STD, "STD", 8},
-	{NONE, "none", 0}
 };
 #define NUM_EXG_OPTS (sizeof(exg_options)/sizeof(exg_options[0]))
 
 const struct channel_option* eeg_opt = eeg_options+2;
 const struct channel_option* exg_opt = exg_options+1;
-
+*/
 
 
 /**************************************************************************
@@ -49,15 +43,51 @@ const struct channel_option* exg_opt = exg_options+1;
  *              Global variables                                          *
  *                                                                        * 
  **************************************************************************/
+#define BIOSEMI_SYSTEM	0
+#define EEGFILE_SYSTEM	1
+#define GTEC_SYSTEM	2
+int system_used = BIOSEMI_SYSTEM;
+const char* uifilename = NULL;
+const char* eegfilename = NULL;
+char settingsfilename[256] = "~/.eegview";
+char eegset[32] = "AB";
+char sensorset[32] = "all";
+
 pthread_t thread_id;
 pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
+struct eegdev* dev = NULL;
 struct xdf* xdf = NULL;
 int run_eeg = 0;
 int record_file = 0;
 #define NSAMPLES	32
-ActivetwoSystemInfo info;
+struct systemcap info;
 struct PanelSettings settings = {
-	.uifilename = NULL
+	.uifilename = NULL,
+	
+};
+
+struct grpconf grp[] = {
+	{
+		.sensortype = EGD_EEG,
+		.index = 0,
+		.iarray = 0,
+		.arr_offset = 0,
+		.datatype = EGD_FLOAT
+	},
+	{
+		.sensortype = EGD_SENSOR,
+		.index = 0,
+		.iarray = 1,
+		.arr_offset = 0,
+		.datatype = EGD_FLOAT
+	},
+	{
+		.sensortype = EGD_TRIGGER,
+		.index = 0,
+		.iarray = 2,
+		.arr_offset = 0,
+		.datatype = EGD_INT32
+	}
 };
 
 int StopRecording(void* user_data);
@@ -66,22 +96,9 @@ int StopRecording(void* user_data);
  *              Error message helper functions                            *
  *                                                                        * 
  **************************************************************************/
-static char* const  acquisition_system_message[] = {
-	"Attempt to open the driver failed.\n\nCheck that it is correctly installed, or that the USB cable is plugged.",
-	"The synchronization with the ADC box is lost.\n\nCheck that the ADC box is switched on or that the optical cable is plugged.",
-	"An attempt to get the data in buffered mode has been made, but the acquisition has not been started yet.",
-	"The buffer is full. Data has been lost",
-	"The specified option is not supported or is not consistent with the capabilities of the system"
-};
-#define NUM_SYS_MESSAGE	(sizeof(acquisition_system_message)/sizeof(char*))
-
-const char* get_acq_message(ActivetwoRetCode retcode)
+const char* get_acq_message(int error)
 {
-	unsigned int msg_ind  = SUCCESS - retcode -1;
-
-	if (msg_ind > NUM_SYS_MESSAGE)
-		return "Unknown error.";
-	return acquisition_system_message[msg_ind];
+	return strerror(error);
 }
 
 static char bdffile_message[128];
@@ -90,12 +107,26 @@ static char bdffile_message[128];
  *              Acquition system callbacks                                *
  *                                                                        * 
  **************************************************************************/
+unsigned int grpindex[EGD_NUM_STYPE] = {
+	[EGD_EEG] = 0, 
+	[EGD_SENSOR] = 64,
+	[EGD_TRIGGER] = 72
+};
+struct eegdev* open_eeg_device(void)
+{
+	if (system_used == BIOSEMI_SYSTEM)
+		return egd_open_biosemi();
+	else if (system_used == EEGFILE_SYSTEM)
+		return egd_open_file(eegfilename, grpindex);
+	else
+		return NULL;
+}
+
+
 void* display_bdf_error(void* arg)
 {
 	EEGPanel* pan = arg;
-
 	eegpanel_popup_message(pan, bdffile_message);
-
 	return NULL;
 }
 
@@ -103,24 +134,22 @@ void* display_bdf_error(void* arg)
 void* reading_thread(void* arg)
 {
 	float *eeg, *exg;
-	uint32_t *tri;
-	int32_t *raweeg, *rawexg;
+	int32_t *tri;
 	EEGPanel* panel = arg;
 	unsigned int neeg, nexg;
-	ActivetwoRetCode ret;
-	int run_acq, saving;
+	int run_acq, saving, error;
+	ssize_t nsread;
 
-	neeg = eeg_opt->numch;
-	nexg = exg_opt->numch;
+	neeg = settings.num_eeg;
+	nexg = settings.num_sensor;
 
 	eeg = calloc(neeg*NSAMPLES, sizeof(*eeg));
 	exg = calloc(nexg*NSAMPLES, sizeof(*exg));
 	tri = calloc(NSAMPLES, sizeof(*tri));
-	raweeg = (int32_t*)eeg;
-	rawexg = (int32_t*)exg;
 	
-	ActivetwoStartBufferedAcquisition();
+	egd_start(dev);
 	while (1) {
+		
 		// update control flags
 		pthread_mutex_lock(&sync_mtx);
 		run_acq = run_eeg;
@@ -132,21 +161,17 @@ void* reading_thread(void* arg)
 			break;
 
 		// Get data from the system
-		ret = ActivetwoGetBufferedSamples(NSAMPLES, tri, raweeg, rawexg);
-		if (ret != SUCCESS) {
+		nsread = egd_get_data(dev, NSAMPLES, eeg, exg, tri);
+		if (nsread < 0) {
+			error = errno;			
 			eegpanel_notify(panel, DISCONNECTED);
-			eegpanel_popup_message(panel, get_acq_message(ret));
+			eegpanel_popup_message(panel, get_acq_message(error));
 			break;
 		}
 
-		// Scale data
-		Act2ScaleArray(float, eeg, int32_t, raweeg, NSAMPLES*neeg, ACTIVE_ELEC_SCALE);
-		Act2ScaleArray(float, exg, int32_t, rawexg, NSAMPLES*nexg, ACTIVE_ELEC_SCALE);
-		Act2ScaleArray(uint32_t, tri, uint32_t, tri, NSAMPLES, TRIGGER_SCALE);
-
 		// Write samples on file
 		if (saving) {
-			if (xdf_write(xdf, NSAMPLES, eeg, exg, tri) < 0) {
+			if (xdf_write(xdf, nsread, eeg, exg, tri) < 0) {
 				pthread_attr_t attr;
 				pthread_t thid;
 			
@@ -160,9 +185,9 @@ void* reading_thread(void* arg)
 		}
 
 		
-		eegpanel_add_samples(panel, eeg, exg, tri, NSAMPLES);
+		eegpanel_add_samples(panel, eeg, exg, (uint32_t*)tri, NSAMPLES);
 	}
-	ActivetwoStopBufferedAcquisition();
+	egd_stop(dev);
 
 	free(eeg);
 	free(exg);
@@ -175,24 +200,30 @@ void* reading_thread(void* arg)
 int Connect(EEGPanel* panel)
 {
 	int retval;
+	size_t strides[3];
 	
-	if ((retval = ActivetwoConnectToSystem()) < 0)
-		return retval;
+	if (!(dev = open_eeg_device()))
+		return errno;
 
 	// Set the number of channels of the "All channels" values
-	info = ActivetwoGetSystemInfo();
-	eeg_options[0].numch = info.maxnumber_eeg_channels;
-	exg_options[0].numch = info.maxnumber_sensor_channels;
+	egd_get_cap(dev, &info);
 	
+	grp[0].nch = settings.num_eeg;
+	grp[1].nch = settings.num_sensor;
+	grp[2].nch = 1;
+	strides[0] = grp[0].nch * sizeof(float);
+	strides[1] = grp[1].nch * sizeof(float);
+	strides[2] = grp[2].nch * sizeof(int32_t);
 
 	// Set the acquisition according to the settings
-	if ((retval = ActivetwoSetDataFormats(eeg_opt->type, exg_opt->type))!=SUCCESS) {
-		ActivetwoDisconnectFromSystem();
+	if (egd_acq_setup(dev, 3, strides, 3, grp)) {
+		retval = errno;
+		egd_close(dev);
 		return retval;
 	}
 
 	// Setup the panel with the settings
-	eegpanel_define_input(panel, eeg_opt->numch, exg_opt->numch, 16, info.samplerate);
+	eegpanel_define_input(panel, settings.num_eeg, settings.num_sensor, 16, info.sampling_freq);
 
 	run_eeg = 1;
 	pthread_create(&thread_id, NULL, reading_thread, panel);
@@ -210,7 +241,7 @@ int Disconnect(EEGPanel* panel)
 	pthread_mutex_unlock(&sync_mtx);
 
 	pthread_join(thread_id, NULL);
-	ActivetwoDisconnectFromSystem();
+	egd_close(dev);
 	return 0;
 }
 
@@ -242,8 +273,8 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	char tmpstr[64];
 	unsigned int j;
 	struct xdfch* ch;
-	unsigned int arrstrides[3] = {eeg_opt->numch*sizeof(float),
-	                        exg_opt->numch*sizeof(float),
+	size_t arrstrides[3] = {settings.num_eeg*sizeof(float),
+	                        settings.num_sensor*sizeof(float),
 				sizeof(uint32_t)};
 
 	filename =
@@ -262,9 +293,9 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	// Set up the channels
 	xdf_set_conf(xdf,
 	             XDF_F_REC_DURATION, 1.0,
-	             XDF_F_REC_NSAMPLE, info.samplerate,
+	             XDF_F_REC_NSAMPLE, info.sampling_freq,
 		     XDF_NOF);
-	for (j = 0; j < eeg_opt->numch; j++) {
+	for (j = 0; j < settings.num_eeg; j++) {
 		// Use labels for channel if available
 		if (settings.eeglabels && j<settings.num_eeg)
 			strncpy(tmpstr, settings.eeglabels[j], sizeof(tmpstr)-1);
@@ -291,7 +322,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 			       XDF_CF_RESERVED, "EEG",
 			       XDF_NOF);
 	}
-	for (j = 0; j < exg_opt->numch; j++) {
+	for (j = 0; j < settings.num_sensor; j++) {
 		// Use labels for channel if available
 		if (settings.sensorlabels && j<settings.num_sensor)
 			strncpy(tmpstr, settings.sensorlabels[j], sizeof(tmpstr)-1);
@@ -327,7 +358,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	               XDF_CF_ARRINDEX, 2,
 		       XDF_CF_ARROFFSET, 0,
 		       XDF_CF_ARRDIGITAL, 0,
-		       XDF_CF_ARRTYPE, XDFUINT32,
+		       XDF_CF_ARRTYPE, XDFINT32,
 		       XDF_CF_LABEL, "Status",
 		       XDF_CF_PMIN, -8388608.0,
 		       XDF_CF_PMAX, 8388607.0,
@@ -379,37 +410,97 @@ int ToggleRecording(int start, void* user_data)
  *              Initialization of the application                         *
  *                                                                        * 
  **************************************************************************/
-const char* opt_str[] = {
-	"--settings=",
-	"--ui-file=",
-	"--map-file=",
-	"--eeg-set=",
-	"--exg-set="
+enum option_index {
+	SETTINGS = 0,
+	UIFILE,
+	EEGSET,
+	SENSORSET,
+	BIOSEMI,
+	FILESRC,
+	GTEC,
+	SOFTWAREVERSION,
+	HELP,
+	NUM_OPTS
 };
-#define NUM_OPTS	(sizeof(opt_str)/sizeof(opt_str[0]))
 
-const struct channel_option* find_chann_opt(const struct channel_option options[], unsigned int num_opt, const char* string)
+static struct option opt_str[] = {
+	[SETTINGS] = {"settings", 1, NULL, 0},
+	[UIFILE] = {"ui-file", 1, NULL, 0},
+	[EEGSET] = {"eeg-set", 1, NULL, 0},
+	[SENSORSET] = {"sensor-set", 1, NULL, 0},
+	[BIOSEMI] = {"biosemi", 0, &system_used, BIOSEMI_SYSTEM},
+	[FILESRC] = {"filesrc", 1, &system_used, EEGFILE_SYSTEM},
+	[GTEC] = {"gtec", 0, &system_used, GTEC_SYSTEM},
+	[SOFTWAREVERSION] = {"version", 0, NULL, 0},
+	[HELP] = {"help", 0, NULL, 'h'}
+};
+
+
+static void print_usage(const char* cmd)
 {
-	unsigned int i;
-	const struct channel_option* chann_opt = NULL;
+	fprintf(stdout,
+"Usage: %s [GTK+ OPTIONS...]\n"
+"            [--settings=FILE] [--ui-file=FILE]\n"
+"            [--eeg-set=EEG_SET] [--sensor-set=SENSOR_SET]\n"
+"            [--biosemi | --filesrc=FILE | --gtec]\n"
+"            [--version] [--help | -h]\n",
+               cmd);
+	
+}
 
-	for (i=0; i<num_opt; i++) {
-		if (strcmp(options[i].string, string)==0) {
-			chann_opt = options + i;
+static void print_version(void)
+{
+	printf("%s: version %s build on\n\t%s\n\t%s\n",
+	       PACKAGE_NAME, 
+	       PACKAGE_VERSION,
+	       egd_get_string(),
+	       xdf_get_string());
+}
+
+static int process_options(int argc, char* argv[])
+{
+	int c;
+	int option_index = 0;
+
+	while (1) {
+		c = getopt_long(argc, argv, "h", opt_str, &option_index);
+		if (c == -1)
 			break;
+
+		switch (c) {
+			case 0:
+				if (option_index == SETTINGS)
+					strncpy(settingsfilename, optarg, sizeof(settingsfilename)-1);
+				else if (option_index == UIFILE)
+					uifilename = optarg;
+				else if (option_index == EEGSET)
+					strncpy(eegset, optarg, sizeof(eegset)-1);
+				else if (option_index == SENSORSET)
+					strncpy(sensorset, optarg, sizeof(sensorset)-1);
+				else if (option_index == FILESRC)
+					eegfilename = optarg;				
+				else if (option_index == SOFTWAREVERSION)
+					print_version();
+				break;
+
+			case 'h':
+				print_usage(argv[0]);
+				return 1;
+
+			case '?':
+				fprintf(stderr, "?? unknown option\n");
+				return -1;
 		}
 	}
 
-	return chann_opt;
+	return 0;
 }
 
 
 int main(int argc, char* argv[])
 {
 	EEGPanel* panel = NULL;
-	int i, retval = 0;
-	unsigned int iopt;
-	const char* opt_vals[NUM_OPTS] = {NULL};
+	int retval = 0;
 	struct PanelCb cb = {
 		.user_data = NULL,
 		.system_connection = SystemConnection,
@@ -420,61 +511,14 @@ int main(int argc, char* argv[])
 
 	// Process command line options
 	init_eegpanel_lib(&argc, &argv);
-	for (i=1; i<argc; i++) {
-		for (iopt=0; iopt<NUM_OPTS; iopt++) {
-			if (strncmp(opt_str[iopt],argv[i],strlen(opt_str[iopt]))==0) {
-				opt_vals[iopt] = argv[i]+strlen(opt_str[iopt]);
-				break;
-			}
-		}
-		// The option has been found so move to the next 
-		if (iopt<NUM_OPTS)
-			continue;
-
-		// Print version of software and its dependencies
-		if (strcmp(argv[i],"--version")==0) {
-			printf("%s: version %s build on\n\t%s\n\t%s\n",argv[0], PACKAGE_VERSION, ActivetwoGetString(),xdf_get_string());
-			return 0;
-		}
-
-		// Print usage string in case of unknown option
-		// or if "--help" or "-h" is provided
-		if ( (iopt == NUM_OPTS)
-		     && (strcmp(argv[i], "--help")!=0)
-		     && (strcmp(argv[i], "-h")!=0) ) {
-		     	fprintf(stderr, "Unknown option\n");
-			retval = 1;
-		}
-		printf("Usage: %s [GTK+ OPTIONS...]\n"
-		       "	    [--settings=FILE] [--map-file=FILE]\n"
-		       "            [--ui-file=FILE] [--eeg-set=EEG_SET]\n"
-		       "            [--exg-set=EXG_SET] [--version]\n",argv[0]);
-
-		return retval;
-	}
+	retval = process_options(argc, argv);
+	if (retval)
+		return (retval > 0) ? 0 : -retval;
 	
-	// Process EEG channels specification
-	if (opt_vals[3]) {
-		eeg_opt = find_chann_opt(eeg_options, NUM_EEG_OPTS, opt_vals[3]);
-		if (!eeg_opt) {
-			fprintf(stderr, "invalid option for EEG (%s)\n",opt_vals[3]);
-			return 1;
-		}
-	}
-	
-	// Process EXG channels specification
-	if (opt_vals[4]) {
-		exg_opt = find_chann_opt(exg_options, NUM_EXG_OPTS, opt_vals[4]);
-		if (!exg_opt) {
-			fprintf(stderr, "invalid option for EXG (%s)\n",opt_vals[4]);
-			return 1;
-		}
-	}
-	
-	read_configuration(&settings, eeg_opt->string, exg_opt->string);
+	read_configuration(&settings, eegset, sensorset, settingsfilename);
 
 
-	settings.uifilename = opt_vals[1];
+	settings.uifilename = uifilename;
 	panel = eegpanel_create(&settings, &cb);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
