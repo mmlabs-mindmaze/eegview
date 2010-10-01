@@ -28,7 +28,7 @@ AC_C_CONST
 os_support=other
 case $host in
 	*win32* | *mingw32* | *cygwin* | *windows*)
-		AM_LDFLAGS="$AM_LDFLAGS -no-undefined"
+		#AM_LDFLAGS="$AM_LDFLAGS -no-undefined"
 		os_support=win32
 		;;
 esac

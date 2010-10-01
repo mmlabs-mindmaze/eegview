@@ -96,7 +96,7 @@ int StopRecording(void* user_data);
  *              Error message helper functions                            *
  *                                                                        * 
  **************************************************************************/
-const char* get_acq_message(int error)
+const char* get_acq_msg(int error)
 {
 	return strerror(error);
 }
@@ -136,16 +136,17 @@ void* reading_thread(void* arg)
 	float *eeg, *exg;
 	int32_t *tri;
 	EEGPanel* panel = arg;
-	unsigned int neeg, nexg;
+	unsigned int neeg, nexg, ntri;
 	int run_acq, saving, error;
 	ssize_t nsread;
 
-	neeg = settings.num_eeg;
-	nexg = settings.num_sensor;
+	neeg = grp[0].nch;
+	nexg = grp[1].nch;
+	ntri = grp[2].nch;
 
 	eeg = calloc(neeg*NSAMPLES, sizeof(*eeg));
 	exg = calloc(nexg*NSAMPLES, sizeof(*exg));
-	tri = calloc(NSAMPLES, sizeof(*tri));
+	tri = calloc(ntri*NSAMPLES, sizeof(*tri));
 	
 	egd_start(dev);
 	while (1) {
@@ -165,7 +166,7 @@ void* reading_thread(void* arg)
 		if (nsread < 0) {
 			error = errno;			
 			eegpanel_notify(panel, DISCONNECTED);
-			eegpanel_popup_message(panel, get_acq_message(error));
+			eegpanel_popup_message(panel, get_acq_msg(error));
 			break;
 		}
 
@@ -208,9 +209,11 @@ int Connect(EEGPanel* panel)
 	// Set the number of channels of the "All channels" values
 	egd_get_cap(dev, &info);
 	
-	grp[0].nch = settings.num_eeg;
-	grp[1].nch = settings.num_sensor;
-	grp[2].nch = 1;
+	grp[0].nch = settings.num_eeg < info.eeg_nmax ?
+	             settings.num_eeg : info.eeg_nmax;
+	grp[1].nch = settings.num_sensor < info.sensor_nmax ?
+	             settings.num_sensor : info.sensor_nmax;
+	grp[2].nch = info.trigger_nmax ? 1 : 0;
 	strides[0] = grp[0].nch * sizeof(float);
 	strides[1] = grp[1].nch * sizeof(float);
 	strides[2] = grp[2].nch * sizeof(int32_t);
@@ -253,7 +256,7 @@ int SystemConnection(int start, void* user_data)
 
 	retval = start ? Connect(panel) : Disconnect(panel);
 	if (retval)
-		eegpanel_popup_message(panel, get_acq_message(retval));
+		eegpanel_popup_message(panel, get_acq_msg(retval));
 
 	return (retval < 0) ? 0 : 1;
 }
@@ -273,9 +276,9 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	char tmpstr[64];
 	unsigned int j;
 	struct xdfch* ch;
-	size_t arrstrides[3] = {settings.num_eeg*sizeof(float),
-	                        settings.num_sensor*sizeof(float),
-				sizeof(uint32_t)};
+	size_t arrstrides[3] = {grp[0].nch*sizeof(float),
+	                        grp[1].nch*sizeof(float),
+				grp[2].nch*sizeof(uint32_t)};
 
 	filename =
 	    eegpanel_open_filename_dialog(panel, "BDF files|*.bdf|*.BDF||Any files|*");
@@ -295,7 +298,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	             XDF_F_REC_DURATION, 1.0,
 	             XDF_F_REC_NSAMPLE, info.sampling_freq,
 		     XDF_NOF);
-	for (j = 0; j < settings.num_eeg; j++) {
+	for (j = 0; j < grp[0].nch; j++) {
 		// Use labels for channel if available
 		if (settings.eeglabels && j<settings.num_eeg)
 			strncpy(tmpstr, settings.eeglabels[j], sizeof(tmpstr)-1);
@@ -322,7 +325,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 			       XDF_CF_RESERVED, "EEG",
 			       XDF_NOF);
 	}
-	for (j = 0; j < settings.num_sensor; j++) {
+	for (j = 0; j < grp[1].nch; j++) {
 		// Use labels for channel if available
 		if (settings.sensorlabels && j<settings.num_sensor)
 			strncpy(tmpstr, settings.sensorlabels[j], sizeof(tmpstr)-1);
@@ -351,24 +354,26 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	}
 
 	// Add the status to the BDF
-	if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
-		goto abort;
+	if (grp[2].nch) {
+		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
+			goto abort;
 
-	xdf_set_chconf(ch, 
-	               XDF_CF_ARRINDEX, 2,
-		       XDF_CF_ARROFFSET, 0,
-		       XDF_CF_ARRDIGITAL, 0,
-		       XDF_CF_ARRTYPE, XDFINT32,
-		       XDF_CF_LABEL, "Status",
-		       XDF_CF_PMIN, -8388608.0,
-		       XDF_CF_PMAX, 8388607.0,
-		       XDF_CF_DMIN, -8388608.0,
-		       XDF_CF_DMAX, 8388607.0,
-		       XDF_CF_PREFILTERING, "No filtering",
-		       XDF_CF_TRANSDUCTER, "Triggers and Status",
-		       XDF_CF_UNIT, "Boolean",
-		       XDF_CF_RESERVED, "TRI",
-		       XDF_NOF);
+		xdf_set_chconf(ch, 
+		               XDF_CF_ARRINDEX, 2,
+			       XDF_CF_ARROFFSET, 0,
+			       XDF_CF_ARRDIGITAL, 0,
+			       XDF_CF_ARRTYPE, XDFINT32,
+			       XDF_CF_LABEL, "Status",
+			       XDF_CF_PMIN, -8388608.0,
+			       XDF_CF_PMAX, 8388607.0,
+			       XDF_CF_DMIN, -8388608.0,
+			       XDF_CF_DMAX, 8388607.0,
+			       XDF_CF_PREFILTERING, "No filtering",
+			       XDF_CF_TRANSDUCTER, "Triggers and Status",
+			       XDF_CF_UNIT, "Boolean",
+			       XDF_CF_RESERVED, "TRI",
+			       XDF_NOF);
+	}
 
 	// Make the file ready for recording
 	xdf_define_arrays(xdf, 3, arrstrides);
@@ -468,28 +473,30 @@ static int process_options(int argc, char* argv[])
 			break;
 
 		switch (c) {
-			case 0:
-				if (option_index == SETTINGS)
-					strncpy(settingsfilename, optarg, sizeof(settingsfilename)-1);
-				else if (option_index == UIFILE)
-					uifilename = optarg;
-				else if (option_index == EEGSET)
-					strncpy(eegset, optarg, sizeof(eegset)-1);
-				else if (option_index == SENSORSET)
-					strncpy(sensorset, optarg, sizeof(sensorset)-1);
-				else if (option_index == FILESRC)
-					eegfilename = optarg;				
-				else if (option_index == SOFTWAREVERSION)
-					print_version();
-				break;
+		case 0:
+			if (option_index == SETTINGS)
+				strncpy(settingsfilename, optarg,
+				        sizeof(settingsfilename)-1);
+			else if (option_index == UIFILE)
+				uifilename = optarg;
+			else if (option_index == EEGSET)
+				strncpy(eegset, optarg, sizeof(eegset)-1);
+			else if (option_index == SENSORSET)
+				strncpy(sensorset, optarg,
+				        sizeof(sensorset)-1);
+			else if (option_index == FILESRC)
+				eegfilename = optarg;
+			else if (option_index == SOFTWAREVERSION)
+				print_version();
+			break;
 
-			case 'h':
-				print_usage(argv[0]);
-				return 1;
+		case 'h':
+			print_usage(argv[0]);
+			return 1;
 
-			case '?':
-				fprintf(stderr, "?? unknown option\n");
-				return -1;
+		case '?':
+			fprintf(stderr, "?? unknown option\n");
+			return -1;
 		}
 	}
 
@@ -528,7 +535,6 @@ int main(int argc, char* argv[])
 	// Run the panel
 	eegpanel_show(panel, 1);
 	eegpanel_run(panel, 0);
-
 
 	eegpanel_destroy(panel);
 	free_configuration(&settings);
