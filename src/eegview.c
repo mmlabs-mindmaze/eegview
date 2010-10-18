@@ -67,6 +67,7 @@ struct PanelSettings settings = {
 	
 };
 
+size_t strides[3];
 struct grpconf grp[] = {
 	{
 		.sensortype = EGD_EEG,
@@ -126,6 +127,33 @@ void* display_bdf_error(void* arg)
 	EEGPanel* pan = arg;
 	eegpanel_popup_message(pan, bdffile_message);
 	return NULL;
+}
+
+int device_connection(void)
+{
+	if (!(dev = open_eeg_device()))
+		return errno;
+
+	// Set the number of channels of the "All channels" values
+	egd_get_cap(dev, &info);
+	
+	grp[0].nch = settings.num_eeg < info.eeg_nmax ?
+	             settings.num_eeg : info.eeg_nmax;
+	grp[1].nch = settings.num_sensor < info.sensor_nmax ?
+	             settings.num_sensor : info.sensor_nmax;
+	grp[2].nch = info.trigger_nmax ? 1 : 0;
+	strides[0] = grp[0].nch * sizeof(float);
+	strides[1] = grp[1].nch * sizeof(float);
+	strides[2] = grp[2].nch * sizeof(int32_t);
+	return 0;
+}
+
+
+
+int device_disconnection(void)
+{
+	egd_close(dev);
+	return 0;
 }
 
 // EEG acquisition thread
@@ -199,22 +227,6 @@ void* reading_thread(void* arg)
 int Connect(EEGPanel* panel)
 {
 	int retval;
-	size_t strides[3];
-	
-	if (!(dev = open_eeg_device()))
-		return errno;
-
-	// Set the number of channels of the "All channels" values
-	egd_get_cap(dev, &info);
-	
-	grp[0].nch = settings.num_eeg < info.eeg_nmax ?
-	             settings.num_eeg : info.eeg_nmax;
-	grp[1].nch = settings.num_sensor < info.sensor_nmax ?
-	             settings.num_sensor : info.sensor_nmax;
-	grp[2].nch = info.trigger_nmax ? 1 : 0;
-	strides[0] = grp[0].nch * sizeof(float);
-	strides[1] = grp[1].nch * sizeof(float);
-	strides[2] = grp[2].nch * sizeof(int32_t);
 
 	// Set the acquisition according to the settings
 	if (egd_acq_setup(dev, 3, strides, 3, grp)) {
@@ -224,7 +236,8 @@ int Connect(EEGPanel* panel)
 	}
 
 	// Setup the panel with the settings
-	eegpanel_define_input(panel, settings.num_eeg, settings.num_sensor, 16, info.sampling_freq);
+	eegpanel_define_input(panel, settings.num_eeg, settings.num_sensor, 
+					16, info.sampling_freq);
 
 	run_eeg = 1;
 	pthread_create(&thread_id, NULL, reading_thread, panel);
@@ -242,7 +255,6 @@ int Disconnect(EEGPanel* panel)
 	pthread_mutex_unlock(&sync_mtx);
 
 	pthread_join(thread_id, NULL);
-	egd_close(dev);
 	return 0;
 }
 
@@ -507,7 +519,7 @@ static int process_options(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
 	EEGPanel* panel = NULL;
-	int retval = 0;
+	int retval = 0, retcode = EXIT_SUCCESS;
 	struct PanelCb cb = {
 		.user_data = NULL,
 		.system_connection = SystemConnection,
@@ -524,12 +536,19 @@ int main(int argc, char* argv[])
 	
 	read_configuration(&settings, eegset, sensorset, settingsfilename);
 
+	if (device_connection()) {
+		fprintf(stderr, "Device connection failed (%i): %s\n",
+				errno, strerror(errno));
+		retcode = EXIT_FAILURE;
+		goto exit;
+	}
 
 	settings.uifilename = uifilename;
 	panel = eegpanel_create(&settings, &cb);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
-		return 2;
+		retcode = EXIT_FAILURE;
+		goto exit;
 	}
 	
 	// Run the panel
@@ -537,8 +556,11 @@ int main(int argc, char* argv[])
 	eegpanel_run(panel, 0);
 
 	eegpanel_destroy(panel);
+exit:
+	device_disconnection();
 	free_configuration(&settings);
+	
 
-	return 0;
+	return retcode;
 }
 
