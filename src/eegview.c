@@ -46,6 +46,7 @@ const struct channel_option* exg_opt = exg_options+1;
 #define BIOSEMI_SYSTEM	0
 #define EEGFILE_SYSTEM	1
 #define GTEC_SYSTEM	2
+#define NEUROSKY_SYSTEM	3
 int system_used = BIOSEMI_SYSTEM;
 const char* uifilename = NULL;
 const char* eegfilename = NULL;
@@ -107,17 +108,14 @@ static char bdffile_message[128];
  *              Acquition system callbacks                                *
  *                                                                        * 
  **************************************************************************/
-unsigned int grpindex[EGD_NUM_STYPE] = {
-	[EGD_EEG] = 0, 
-	[EGD_SENSOR] = 64,
-	[EGD_TRIGGER] = 72
-};
 struct eegdev* open_eeg_device(void)
 {
 	if (system_used == BIOSEMI_SYSTEM)
 		return egd_open_biosemi();
 	else if (system_used == EEGFILE_SYSTEM)
-		return egd_open_file(eegfilename, grpindex);
+		return egd_open_file(eegfilename);
+	else if (system_used == NEUROSKY_SYSTEM)
+		return egd_open_neurosky("/dev/rfcomm0");
 	else
 		return NULL;
 }
@@ -422,6 +420,7 @@ enum option_index {
 	SENSORSET,
 	BIOSEMI,
 	FILESRC,
+	NEUROSKY,
 	GTEC,
 	SOFTWAREVERSION,
 	HELP,
@@ -435,6 +434,7 @@ static struct option opt_str[] = {
 	[SENSORSET] = {"sensor-set", 1, NULL, 0},
 	[BIOSEMI] = {"biosemi", 0, &system_used, BIOSEMI_SYSTEM},
 	[FILESRC] = {"filesrc", 1, &system_used, EEGFILE_SYSTEM},
+	[NEUROSKY] = {"neurosky", 0, &system_used, NEUROSKY_SYSTEM},
 	[GTEC] = {"gtec", 0, &system_used, GTEC_SYSTEM},
 	[SOFTWAREVERSION] = {"version", 0, NULL, 0},
 	[HELP] = {"help", 0, NULL, 'h'}
@@ -447,7 +447,7 @@ static void print_usage(const char* cmd)
 "Usage: %s [GTK+ OPTIONS...]\n"
 "            [--settings=FILE] [--ui-file=FILE]\n"
 "            [--eeg-set=EEG_SET] [--sensor-set=SENSOR_SET]\n"
-"            [--biosemi | --filesrc=FILE | --gtec]\n"
+"            [--biosemi | --filesrc=FILE | --gtec | --neurosky]\n"
 "            [--version] [--help | -h]\n",
                cmd);
 	
