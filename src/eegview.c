@@ -116,7 +116,10 @@ struct eegdev* open_eeg_device(void)
 	else if (system_used == EEGFILE_SYSTEM)
 		return egd_open_file(eegfilename);
 	else if (system_used == NEUROSKY_SYSTEM)
-		return egd_open_neurosky("/dev/rfcomm0");
+		return egd_open_neurosky(
+			"/dev/rfcomm0"
+			//"/homes/nbourdau/prog/eegview/build/neurosky.bin"
+			);
 	else
 		return NULL;
 }
@@ -148,7 +151,39 @@ int device_connection(void)
 	return 0;
 }
 
+int set_settings_from_device(struct PanelSettings* settings)
+{
+	unsigned int i;
+	char** labels;
+	char value[32];
+	free_configuration(settings);
 
+	labels = calloc(info.eeg_nmax+1, sizeof(char*));
+	if (labels == NULL)
+		return 0;
+	
+	// Allocate and copy each labels
+	for (i=0; i<info.eeg_nmax; i++) {
+		egd_channel_info(dev, EGD_EEG, i, EGD_LABEL, value,EGD_EOL);
+		labels[i] = malloc(strlen(value)+1);
+		strcpy(labels[i], value);
+	}
+	settings->eeglabels = (const char**)labels;
+	settings->num_eeg = info.eeg_nmax;
+
+	labels = calloc(info.sensor_nmax+1, sizeof(char*));
+	if (labels == NULL)
+		return 0;
+	
+	// Allocate and copy each labels
+	for (i=0; i<info.sensor_nmax; i++) {
+		egd_channel_info(dev, EGD_SENSOR, i, EGD_LABEL, value,EGD_EOL);
+		labels[i] = malloc(strlen(value)+1);
+		strcpy(labels[i], value);
+	}
+	settings->sensorlabels = (const char**)labels;
+	settings->num_sensor = info.sensor_nmax;
+}
 
 int device_disconnection(void)
 {
@@ -170,9 +205,9 @@ void* reading_thread(void* arg)
 	nexg = grp[1].nch;
 	ntri = grp[2].nch;
 
-	eeg = calloc(neeg*NSAMPLES, sizeof(*eeg));
-	exg = calloc(nexg*NSAMPLES, sizeof(*exg));
-	tri = calloc(ntri*NSAMPLES, sizeof(*tri));
+	eeg = neeg ? calloc(neeg*NSAMPLES, sizeof(*eeg)) : NULL;
+	exg = nexg ? calloc(nexg*NSAMPLES, sizeof(*exg)) : NULL;
+	tri = ntri ? calloc(ntri*NSAMPLES, sizeof(*tri)) : NULL;
 	
 	egd_start(dev);
 	while (1) {
@@ -237,7 +272,7 @@ int Connect(EEGPanel* panel)
 
 	// Setup the panel with the settings
 	eegpanel_define_input(panel, settings.num_eeg, settings.num_sensor, 
-					16, info.sampling_freq);
+					0, info.sampling_freq);
 
 	run_eeg = 1;
 	pthread_create(&thread_id, NULL, reading_thread, panel);
@@ -276,6 +311,45 @@ int SystemConnection(int start, void* user_data)
  *              File recording callbacks                                  *
  *                                                                        * 
  **************************************************************************/
+int setup_xdf_channel_group(int igrp)
+{
+	char tmpstr[64], label[32], transducter[128], unit[16];
+	double mm[2];
+	unsigned int j;
+	int isint;
+	struct xdfch* ch;
+
+	egd_channel_info(dev, grp[igrp].sensortype, 0,
+			 EGD_UNIT, unit,
+			 EGD_TRANSDUCTER, transducter,
+			 EGD_MM_D, mm,
+			 EGD_ISINT, &isint,
+			 EGD_EOL);
+
+	xdf_set_conf(xdf, 
+	               XDF_CF_ARRINDEX, igrp,
+		       XDF_CF_ARROFFSET, 0,
+		       XDF_CF_ARRDIGITAL, 0,
+		       XDF_CF_ARRTYPE, isint ? XDFINT32 : XDFFLOAT,
+		       XDF_CF_PMIN, mm[0],
+		       XDF_CF_PMAX, mm[1],
+		       XDF_CF_TRANSDUCTER, transducter,
+		       XDF_CF_UNIT, unit,
+		       XDF_NOF);
+
+	for (j = 0; j < grp[igrp].nch; j++) {
+		egd_channel_info(dev, grp[0].sensortype, j,
+		                 EGD_LABEL, label, EGD_EOL);
+
+		// Add the channel to the BDF
+		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
+			return -1;
+
+		xdf_set_chconf(ch, XDF_CF_LABEL, label, XDF_NOF);
+	}
+	return 0;
+}
+
 int SetupRecording(const ChannelSelection * eeg_sel,
 		   const ChannelSelection * exg_sel, void *user_data)
 {
@@ -283,9 +357,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	(void)exg_sel;
 	EEGPanel *panel = user_data;
 	char *filename;
-	char tmpstr[64];
 	unsigned int j;
-	struct xdfch* ch;
 	size_t arrstrides[3] = {grp[0].nch*sizeof(float),
 	                        grp[1].nch*sizeof(float),
 				grp[2].nch*sizeof(uint32_t)};
@@ -302,92 +374,20 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	if (!xdf) 
 		goto abort;
 
-
-	// Set up the channels
+	// Configuration file genral header
 	xdf_set_conf(xdf,
 	             XDF_F_REC_DURATION, 1.0,
 	             XDF_F_REC_NSAMPLE, info.sampling_freq,
 		     XDF_NOF);
-	for (j = 0; j < grp[0].nch; j++) {
-		// Use labels for channel if available
-		if (settings.eeglabels && j<settings.num_eeg)
-			strncpy(tmpstr, settings.eeglabels[j], sizeof(tmpstr)-1);
-		else
-			sprintf(tmpstr, "EEG%i", j+1);
 
-		// Add the channel to the BDF
-		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
+	// Set up the channels
+	for (j=0; j<3; j++)	
+		if (setup_xdf_channel_group(j))
 			goto abort;
-
-		xdf_set_chconf(ch, 
-		               XDF_CF_ARRINDEX, 0,
-			       XDF_CF_ARROFFSET, j*sizeof(float),
-			       XDF_CF_ARRDIGITAL, 0,
-			       XDF_CF_ARRTYPE, XDFFLOAT,
-			       XDF_CF_LABEL, tmpstr,
-			       XDF_CF_PMIN, -262144.0,
-			       XDF_CF_PMAX, 262143.0,
-			       XDF_CF_DMIN, -8388608.0,
-			       XDF_CF_DMAX, 8388607.0,
-			       XDF_CF_PREFILTERING, "HP: DC; LP: 417 Hz",
-			       XDF_CF_TRANSDUCTER, "Active Electrode",
-			       XDF_CF_UNIT, "uV",
-			       XDF_CF_RESERVED, "EEG",
-			       XDF_NOF);
-	}
-	for (j = 0; j < grp[1].nch; j++) {
-		// Use labels for channel if available
-		if (settings.sensorlabels && j<settings.num_sensor)
-			strncpy(tmpstr, settings.sensorlabels[j], sizeof(tmpstr)-1);
-		else
-			sprintf(tmpstr, "EXG%i", j+1);
-
-		// Add the channel to the BDF
-		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
-			goto abort;
-
-		xdf_set_chconf(ch, 
-		               XDF_CF_ARRINDEX, 1,
-			       XDF_CF_ARROFFSET, j*sizeof(float),
-			       XDF_CF_ARRDIGITAL, 0,
-			       XDF_CF_ARRTYPE, XDFFLOAT,
-			       XDF_CF_LABEL, tmpstr,
-			       XDF_CF_PMIN, -262144.0,
-			       XDF_CF_PMAX, 262143.0,
-			       XDF_CF_DMIN, -8388608.0,
-			       XDF_CF_DMAX, 8388607.0,
-			       XDF_CF_PREFILTERING, "HP: DC; LP: 417 Hz",
-			       XDF_CF_TRANSDUCTER, "Active Electrode",
-			       XDF_CF_UNIT, "uV",
-			       XDF_CF_RESERVED, "EXG",
-			       XDF_NOF);
-	}
-
-	// Add the status to the BDF
-	if (grp[2].nch) {
-		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
-			goto abort;
-
-		xdf_set_chconf(ch, 
-		               XDF_CF_ARRINDEX, 2,
-			       XDF_CF_ARROFFSET, 0,
-			       XDF_CF_ARRDIGITAL, 0,
-			       XDF_CF_ARRTYPE, XDFINT32,
-			       XDF_CF_LABEL, "Status",
-			       XDF_CF_PMIN, -8388608.0,
-			       XDF_CF_PMAX, 8388607.0,
-			       XDF_CF_DMIN, -8388608.0,
-			       XDF_CF_DMAX, 8388607.0,
-			       XDF_CF_PREFILTERING, "No filtering",
-			       XDF_CF_TRANSDUCTER, "Triggers and Status",
-			       XDF_CF_UNIT, "Boolean",
-			       XDF_CF_RESERVED, "TRI",
-			       XDF_NOF);
-	}
 
 	// Make the file ready for recording
 	xdf_define_arrays(xdf, 3, arrstrides);
-	if(xdf_prepare_transfer(xdf))
+	if (xdf_prepare_transfer(xdf))
 		goto abort;
 
 	return 1;
@@ -542,6 +542,7 @@ int main(int argc, char* argv[])
 		retcode = EXIT_FAILURE;
 		goto exit;
 	}
+	set_settings_from_device(&settings);
 
 	settings.uifilename = uifilename;
 	panel = eegpanel_create(&settings, &cb);
