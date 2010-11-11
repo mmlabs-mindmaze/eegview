@@ -112,7 +112,7 @@ static char bdffile_message[128];
 struct eegdev* open_eeg_device(void)
 {
 	if (system_used == BIOSEMI_SYSTEM)
-		return egd_open_biosemi();
+		return egd_open_biosemi(64);
 	else if (system_used == EEGFILE_SYSTEM)
 		return egd_open_file(eegfilename);
 	else if (system_used == NEUROSKY_SYSTEM)
@@ -231,6 +231,7 @@ void* reading_thread(void* arg)
 			break;
 		}
 
+		
 		// Write samples on file
 		if (saving) {
 			if (xdf_write(xdf, nsread, eeg, exg, tri) < 0) {
@@ -272,7 +273,7 @@ int Connect(EEGPanel* panel)
 
 	// Setup the panel with the settings
 	eegpanel_define_input(panel, settings.num_eeg, settings.num_sensor, 
-					0, info.sampling_freq);
+					16, info.sampling_freq);
 
 	run_eeg = 1;
 	pthread_create(&thread_id, NULL, reading_thread, panel);
@@ -360,7 +361,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 	unsigned int j;
 	size_t arrstrides[3] = {grp[0].nch*sizeof(float),
 	                        grp[1].nch*sizeof(float),
-				grp[2].nch*sizeof(uint32_t)};
+				grp[2].nch*sizeof(int32_t)};
 
 	filename =
 	    eegpanel_open_filename_dialog(panel, "BDF files|*.bdf|*.BDF||Any files|*");
