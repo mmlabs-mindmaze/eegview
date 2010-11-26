@@ -12,7 +12,7 @@
 # include <config.h>
 #endif
 
-#include "configuration.h"
+//#include "configuration.h"
 
 /**************************************************************************
  *                                                                        *
@@ -62,10 +62,6 @@ int run_eeg = 0;
 int record_file = 0;
 #define NSAMPLES	32
 struct systemcap info;
-struct PanelSettings settings = {
-	.uifilename = NULL,
-	
-};
 
 size_t strides[3];
 struct grpconf grp[] = {
@@ -91,6 +87,15 @@ struct grpconf grp[] = {
 		.datatype = EGD_INT32
 	}
 };
+	
+static char **labels[2] = {NULL, NULL};
+
+#define NTAB 3
+struct panel_tabconf tabconf[NTAB] = {
+	{.type = TABTYPE_SCOPE, "EEG"},
+	{.type = TABTYPE_BARGRAPH, "Offsets"},
+	{.type = TABTYPE_SCOPE, "Sensors"}
+};
 
 int StopRecording(void* user_data);
 /**************************************************************************
@@ -109,6 +114,40 @@ static char bdffile_message[128];
  *              Acquition system callbacks                                *
  *                                                                        * 
  **************************************************************************/
+static
+void free_labels(void)
+{
+	unsigned int igrp, i;
+
+	for (igrp=0; igrp<2; igrp++) {
+		for (i=0; i<grp[igrp].nch; i++) 
+			free(labels[igrp][i]);
+
+		free(labels[igrp]);
+	}
+}
+
+static
+int get_labels_from_device(void)
+{
+	unsigned int i, igrp;
+	int type;
+
+	// Allocate and copy each labels
+	for (igrp=0; igrp<2; igrp++) {
+		labels[igrp] = malloc(grp[igrp].nch * sizeof(char*));
+		type = grp[igrp].sensortype;
+		for (i=0; i<grp[igrp].nch; i++) {
+			labels[igrp][i] = malloc(32);
+			egd_channel_info(dev, type, i,
+			               EGD_LABEL, labels[igrp][i], EGD_EOL);
+		}
+	}
+	return 0;
+}
+
+
+static
 struct eegdev* open_eeg_device(void)
 {
 	if (system_used == BIOSEMI_SYSTEM)
@@ -125,6 +164,7 @@ struct eegdev* open_eeg_device(void)
 }
 
 
+static
 void* display_bdf_error(void* arg)
 {
 	EEGPanel* pan = arg;
@@ -132,64 +172,44 @@ void* display_bdf_error(void* arg)
 	return NULL;
 }
 
+static
 int device_connection(void)
 {
+	int retval;
 	if (!(dev = open_eeg_device()))
 		return errno;
 
 	// Set the number of channels of the "All channels" values
 	egd_get_cap(dev, &info);
 	
-	grp[0].nch = settings.num_eeg < info.eeg_nmax ?
-	             settings.num_eeg : info.eeg_nmax;
-	grp[1].nch = settings.num_sensor < info.sensor_nmax ?
-	             settings.num_sensor : info.sensor_nmax;
+	grp[0].nch = info.eeg_nmax;
+	grp[1].nch = info.sensor_nmax;
 	grp[2].nch = info.trigger_nmax ? 1 : 0;
 	strides[0] = grp[0].nch * sizeof(float);
 	strides[1] = grp[1].nch * sizeof(float);
 	strides[2] = grp[2].nch * sizeof(int32_t);
+
+	get_labels_from_device();
+
+	// Set the acquisition according to the settings
+	if (egd_acq_setup(dev, 3, strides, 3, grp)) {
+		retval = errno;
+		egd_close(dev);
+		return retval;
+	}
+
 	return 0;
 }
 
-int set_settings_from_device(struct PanelSettings* settings)
-{
-	unsigned int i;
-	char** labels;
-	char value[32];
-	free_configuration(settings);
 
-	labels = calloc(info.eeg_nmax+1, sizeof(char*));
-	if (labels == NULL)
-		return 0;
-	
-	// Allocate and copy each labels
-	for (i=0; i<info.eeg_nmax; i++) {
-		egd_channel_info(dev, EGD_EEG, i, EGD_LABEL, value,EGD_EOL);
-		labels[i] = malloc(strlen(value)+1);
-		strcpy(labels[i], value);
-	}
-	settings->eeglabels = (const char**)labels;
-	settings->num_eeg = info.eeg_nmax;
-
-	labels = calloc(info.sensor_nmax+1, sizeof(char*));
-	if (labels == NULL)
-		return 0;
-	
-	// Allocate and copy each labels
-	for (i=0; i<info.sensor_nmax; i++) {
-		egd_channel_info(dev, EGD_SENSOR, i, EGD_LABEL, value,EGD_EOL);
-		labels[i] = malloc(strlen(value)+1);
-		strcpy(labels[i], value);
-	}
-	settings->sensorlabels = (const char**)labels;
-	settings->num_sensor = info.sensor_nmax;
-}
-
+static
 int device_disconnection(void)
 {
+	free_labels();
 	egd_close(dev);
 	return 0;
 }
+
 
 // EEG acquisition thread
 void* reading_thread(void* arg)
@@ -207,7 +227,7 @@ void* reading_thread(void* arg)
 
 	eeg = neeg ? calloc(neeg*NSAMPLES, sizeof(*eeg)) : NULL;
 	exg = nexg ? calloc(nexg*NSAMPLES, sizeof(*exg)) : NULL;
-	tri = ntri ? calloc(ntri*NSAMPLES, sizeof(*tri)) : NULL;
+	tri = calloc(NSAMPLES, sizeof(*tri));
 	
 	egd_start(dev);
 	while (1) {
@@ -247,8 +267,10 @@ void* reading_thread(void* arg)
 			}
 		}
 
-		
-		eegpanel_add_samples(panel, eeg, exg, (uint32_t*)tri, NSAMPLES);
+		eegpanel_add_samples(panel, 0, nsread, eeg);
+		eegpanel_add_samples(panel, 1, nsread, eeg);
+		eegpanel_add_samples(panel, 2, nsread, exg);
+		eegpanel_add_triggers(panel, nsread, (const uint32_t*)tri);
 	}
 	egd_stop(dev);
 
@@ -260,20 +282,18 @@ void* reading_thread(void* arg)
 }
 
 // Connection to the system 
+static
 int Connect(EEGPanel* panel)
 {
 	int retval;
-
-	// Set the acquisition according to the settings
-	if (egd_acq_setup(dev, 3, strides, 3, grp)) {
-		retval = errno;
-		egd_close(dev);
-		return retval;
-	}
+	float fs = info.sampling_freq;
+	const char*** clabels = (const char***)labels;
 
 	// Setup the panel with the settings
-	eegpanel_define_input(panel, settings.num_eeg, settings.num_sensor, 
-					16, info.sampling_freq);
+	eegpanel_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
+	eegpanel_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
+	eegpanel_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
+	eegpanel_define_triggers(panel, 16, info.sampling_freq);
 
 	run_eeg = 1;
 	pthread_create(&thread_id, NULL, reading_thread, panel);
@@ -282,6 +302,7 @@ int Connect(EEGPanel* panel)
 }
 
 
+static
 int Disconnect(EEGPanel* panel)
 {
 	(void)panel;
@@ -295,6 +316,7 @@ int Disconnect(EEGPanel* panel)
 }
 
 
+static
 int SystemConnection(int start, void* user_data)
 {
 	EEGPanel* panel = user_data;
@@ -312,6 +334,7 @@ int SystemConnection(int start, void* user_data)
  *              File recording callbacks                                  *
  *                                                                        * 
  **************************************************************************/
+static
 int setup_xdf_channel_group(int igrp)
 {
 	char tmpstr[64], label[32], transducter[128], unit[16];
@@ -339,35 +362,28 @@ int setup_xdf_channel_group(int igrp)
 		       XDF_NOF);
 
 	for (j = 0; j < grp[igrp].nch; j++) {
-		egd_channel_info(dev, grp[0].sensortype, j,
+		egd_channel_info(dev, grp[igrp].sensortype, j,
 		                 EGD_LABEL, label, EGD_EOL);
 
 		// Add the channel to the BDF
-		if ((ch = xdf_add_channel(xdf, NULL)) == NULL)
+		if ((ch = xdf_add_channel(xdf, label)) == NULL)
 			return -1;
-
-		xdf_set_chconf(ch, XDF_CF_LABEL, label, XDF_NOF);
 	}
 	return 0;
 }
 
-int SetupRecording(const ChannelSelection * eeg_sel,
-		   const ChannelSelection * exg_sel, void *user_data)
+static
+int SetupRecording(void *user_data)
 {
-	(void)eeg_sel;
-	(void)exg_sel;
 	EEGPanel *panel = user_data;
 	char *filename;
 	unsigned int j;
-	size_t arrstrides[3] = {grp[0].nch*sizeof(float),
-	                        grp[1].nch*sizeof(float),
-				grp[2].nch*sizeof(int32_t)};
 
-	filename =
-	    eegpanel_open_filename_dialog(panel, "BDF files|*.bdf|*.BDF||Any files|*");
+	filename = eegpanel_open_filename_dialog(panel,
+	                              "BDF files|*.bdf|*.BDF||Any files|*");
 	
 	// Check that user hasn't press cancel
-	if (!filename)
+	if (filename == NULL)
 		return 0;
 
 	// Create the BDF file
@@ -387,7 +403,7 @@ int SetupRecording(const ChannelSelection * eeg_sel,
 			goto abort;
 
 	// Make the file ready for recording
-	xdf_define_arrays(xdf, 3, arrstrides);
+	xdf_define_arrays(xdf, 3, strides);
 	if (xdf_prepare_transfer(xdf))
 		goto abort;
 
@@ -411,6 +427,7 @@ int StopRecording(void* user_data)
 	xdf = NULL;
 	return 1;
 }
+
 
 int ToggleRecording(int start, void* user_data)
 {
@@ -535,18 +552,15 @@ int main(int argc, char* argv[])
 	if (retval)
 		return (retval > 0) ? 0 : -retval;
 	
-	read_configuration(&settings, eegset, sensorset, settingsfilename);
-
 	if (device_connection()) {
 		fprintf(stderr, "Device connection failed (%i): %s\n",
 				errno, strerror(errno));
 		retcode = EXIT_FAILURE;
 		goto exit;
 	}
-	set_settings_from_device(&settings);
 
-	settings.uifilename = uifilename;
-	panel = eegpanel_create(&settings, &cb);
+
+	panel = eegpanel_create(NULL, &cb, NTAB, tabconf);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
 		retcode = EXIT_FAILURE;
@@ -560,8 +574,6 @@ int main(int argc, char* argv[])
 	eegpanel_destroy(panel);
 exit:
 	device_disconnection();
-	free_configuration(&settings);
-	
 
 	return retcode;
 }
