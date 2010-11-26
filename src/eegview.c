@@ -50,9 +50,6 @@ const struct channel_option* exg_opt = exg_options+1;
 int system_used = BIOSEMI_SYSTEM;
 const char* uifilename = NULL;
 const char* eegfilename = NULL;
-char settingsfilename[256] = "~/.eegview";
-char eegset[32] = "AB";
-char sensorset[32] = "all";
 
 pthread_t thread_id;
 pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -97,7 +94,7 @@ struct panel_tabconf tabconf[NTAB] = {
 	{.type = TABTYPE_SCOPE, "Sensors"}
 };
 
-int StopRecording(void* user_data);
+static int StopRecording(void* user_data);
 /**************************************************************************
  *                                                                        *
  *              Error message helper functions                            *
@@ -120,6 +117,8 @@ void free_labels(void)
 	unsigned int igrp, i;
 
 	for (igrp=0; igrp<2; igrp++) {
+		if (labels[igrp] == NULL)
+			continue;
 		for (i=0; i<grp[igrp].nch; i++) 
 			free(labels[igrp][i]);
 
@@ -416,6 +415,7 @@ abort:
 	return 0;
 }
 
+static
 int StopRecording(void* user_data)
 {
 	(void)user_data;
@@ -429,6 +429,7 @@ int StopRecording(void* user_data)
 }
 
 
+static
 int ToggleRecording(int start, void* user_data)
 {
 	(void)user_data;
@@ -458,10 +459,7 @@ enum option_index {
 };
 
 static struct option opt_str[] = {
-	[SETTINGS] = {"settings", 1, NULL, 0},
 	[UIFILE] = {"ui-file", 1, NULL, 0},
-	[EEGSET] = {"eeg-set", 1, NULL, 0},
-	[SENSORSET] = {"sensor-set", 1, NULL, 0},
 	[BIOSEMI] = {"biosemi", 0, &system_used, BIOSEMI_SYSTEM},
 	[FILESRC] = {"filesrc", 1, &system_used, EEGFILE_SYSTEM},
 	[NEUROSKY] = {"neurosky", 0, &system_used, NEUROSKY_SYSTEM},
@@ -492,7 +490,8 @@ static void print_version(void)
 	       xdf_get_string());
 }
 
-static int process_options(int argc, char* argv[])
+static 
+int process_options(int argc, char* argv[])
 {
 	int c;
 	int option_index = 0;
@@ -504,16 +503,8 @@ static int process_options(int argc, char* argv[])
 
 		switch (c) {
 		case 0:
-			if (option_index == SETTINGS)
-				strncpy(settingsfilename, optarg,
-				        sizeof(settingsfilename)-1);
-			else if (option_index == UIFILE)
+			if (option_index == UIFILE)
 				uifilename = optarg;
-			else if (option_index == EEGSET)
-				strncpy(eegset, optarg, sizeof(eegset)-1);
-			else if (option_index == SENSORSET)
-				strncpy(sensorset, optarg,
-				        sizeof(sensorset)-1);
 			else if (option_index == FILESRC)
 				eegfilename = optarg;
 			else if (option_index == SOFTWAREVERSION)
@@ -525,7 +516,7 @@ static int process_options(int argc, char* argv[])
 			return 1;
 
 		case '?':
-			fprintf(stderr, "?? unknown option\n");
+			print_usage(argv[0]);
 			return -1;
 		}
 	}
@@ -537,7 +528,7 @@ static int process_options(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
 	EEGPanel* panel = NULL;
-	int retval = 0, retcode = EXIT_SUCCESS;
+	int retval = 0, retcode = EXIT_FAILURE;
 	struct PanelCb cb = {
 		.user_data = NULL,
 		.system_connection = SystemConnection,
@@ -553,9 +544,7 @@ int main(int argc, char* argv[])
 		return (retval > 0) ? 0 : -retval;
 	
 	if (device_connection()) {
-		fprintf(stderr, "Device connection failed (%i): %s\n",
-				errno, strerror(errno));
-		retcode = EXIT_FAILURE;
+		perror("Device connection failed");
 		goto exit;
 	}
 
@@ -563,7 +552,6 @@ int main(int argc, char* argv[])
 	panel = eegpanel_create(NULL, &cb, NTAB, tabconf);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
-		retcode = EXIT_FAILURE;
 		goto exit;
 	}
 	
@@ -572,9 +560,10 @@ int main(int argc, char* argv[])
 	eegpanel_run(panel, 0);
 
 	eegpanel_destroy(panel);
+	retcode = EXIT_SUCCESS;
+
 exit:
 	device_disconnection();
-
 	return retcode;
 }
 
