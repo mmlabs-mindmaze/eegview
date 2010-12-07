@@ -151,6 +151,8 @@ struct eegdev* open_eeg_device(void)
 {
 	if (system_used == BIOSEMI_SYSTEM)
 		return egd_open_biosemi(64);
+	else if (system_used == GTEC_SYSTEM)
+		return egd_open_gtec();
 	else if (system_used == EEGFILE_SYSTEM)
 		return egd_open_file(eegfilename);
 	else if (system_used == NEUROSKY_SYSTEM)
@@ -284,7 +286,6 @@ void* reading_thread(void* arg)
 static
 int Connect(EEGPanel* panel)
 {
-	int retval;
 	float fs = info.sampling_freq;
 	const char*** clabels = (const char***)labels;
 
@@ -336,7 +337,7 @@ int SystemConnection(int start, void* user_data)
 static
 int setup_xdf_channel_group(int igrp)
 {
-	char tmpstr[64], label[32], transducter[128], unit[16];
+	char /*tmpstr[64],*/ label[32], transducter[128], unit[16];
 	double mm[2];
 	unsigned int j;
 	int isint;
@@ -445,10 +446,7 @@ int ToggleRecording(int start, void* user_data)
  *                                                                        * 
  **************************************************************************/
 enum option_index {
-	SETTINGS = 0,
 	UIFILE,
-	EEGSET,
-	SENSORSET,
 	BIOSEMI,
 	FILESRC,
 	NEUROSKY,
@@ -466,6 +464,7 @@ static struct option opt_str[] = {
 	[GTEC] = {"gtec", 0, &system_used, GTEC_SYSTEM},
 	[SOFTWAREVERSION] = {"version", 0, NULL, 0},
 	[HELP] = {"help", 0, NULL, 'h'}
+
 };
 
 
