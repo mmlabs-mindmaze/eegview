@@ -58,7 +58,6 @@ struct xdf* xdf = NULL;
 int run_eeg = 0;
 int record_file = 0;
 #define NSAMPLES	32
-struct systemcap info;
 
 size_t strides[3];
 struct grpconf grp[] = {
@@ -181,11 +180,9 @@ int device_connection(void)
 		return errno;
 
 	// Set the number of channels of the "All channels" values
-	egd_get_cap(dev, &info);
-	
-	grp[0].nch = info.eeg_nmax;
-	grp[1].nch = info.sensor_nmax;
-	grp[2].nch = info.trigger_nmax ? 1 : 0;
+	grp[0].nch = egd_get_numch(dev, EGD_EEG);
+	grp[1].nch = egd_get_numch(dev, EGD_SENSOR);
+	grp[2].nch = egd_get_numch(dev, EGD_TRIGGER) ? 1 : 0;
 	strides[0] = grp[0].nch * sizeof(float);
 	strides[1] = grp[1].nch * sizeof(float);
 	strides[2] = grp[2].nch * sizeof(int32_t);
@@ -286,14 +283,14 @@ void* reading_thread(void* arg)
 static
 int Connect(EEGPanel* panel)
 {
-	float fs = info.sampling_freq;
+	float fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 	const char*** clabels = (const char***)labels;
 
 	// Setup the panel with the settings
 	eegpanel_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
 	eegpanel_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
 	eegpanel_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
-	eegpanel_define_triggers(panel, 16, info.sampling_freq);
+	eegpanel_define_triggers(panel, 16, fs);
 
 	run_eeg = 1;
 	pthread_create(&thread_id, NULL, reading_thread, panel);
@@ -378,6 +375,7 @@ int SetupRecording(void *user_data)
 	EEGPanel *panel = user_data;
 	char *filename;
 	unsigned int j;
+	int fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 
 	filename = eegpanel_open_filename_dialog(panel,
 	                              "BDF files|*.bdf|*.BDF||Any files|*");
@@ -394,7 +392,7 @@ int SetupRecording(void *user_data)
 	// Configuration file genral header
 	xdf_set_conf(xdf,
 	             XDF_F_REC_DURATION, 1.0,
-	             XDF_F_REC_NSAMPLE, info.sampling_freq,
+	             XDF_F_REC_NSAMPLE, fs,
 		     XDF_NOF);
 
 	// Set up the channels
