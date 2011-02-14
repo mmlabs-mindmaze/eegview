@@ -53,6 +53,7 @@ const char* eegfilename = NULL;
 
 pthread_t thread_id;
 pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t file_mtx = PTHREAD_MUTEX_INITIALIZER;
 struct eegdev* dev = NULL;
 struct xdf* xdf = NULL;
 int run_eeg = 0;
@@ -216,7 +217,7 @@ void* reading_thread(void* arg)
 	int32_t *tri;
 	EEGPanel* panel = arg;
 	unsigned int neeg, nexg, ntri;
-	int run_acq, saving, error;
+	int run_acq, error, saving = 0;
 	ssize_t nsread;
 
 	neeg = grp[0].nch;
@@ -233,7 +234,14 @@ void* reading_thread(void* arg)
 		// update control flags
 		pthread_mutex_lock(&sync_mtx);
 		run_acq = run_eeg;
-		saving = record_file;
+		if (saving != record_file) {
+			// report write status back
+			if (record_file)
+				pthread_mutex_lock(&file_mtx);
+			else
+				pthread_mutex_unlock(&file_mtx);
+			saving = record_file;
+		}
 		pthread_mutex_unlock(&sync_mtx);
 
 		// Check the stop acquisition flag
@@ -255,9 +263,14 @@ void* reading_thread(void* arg)
 			if (xdf_write(xdf, nsread, eeg, exg, tri) < 0) {
 				pthread_attr_t attr;
 				pthread_t thid;
-			
-				StopRecording(NULL);
 				sprintf(bdffile_message,"XDF Error: %s",strerror(errno));
+			
+				// Stop recording
+				saving = 0;
+				pthread_mutex_unlock(&file_mtx);
+				StopRecording(NULL);
+
+				// Pop up message
 				pthread_attr_init(&attr);
 				pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 				pthread_create(&thid, &attr, display_bdf_error, panel);
@@ -270,6 +283,10 @@ void* reading_thread(void* arg)
 		eegpanel_add_samples(panel, 2, nsread, exg);
 		eegpanel_add_triggers(panel, nsread, (const uint32_t*)tri);
 	}
+
+	if (saving)
+		pthread_mutex_unlock(&file_mtx);
+
 	egd_stop(dev);
 
 	free(eeg);
@@ -418,12 +435,16 @@ static
 int StopRecording(void* user_data)
 {
 	(void)user_data;
+
 	pthread_mutex_lock(&sync_mtx);
 	record_file = 0;
 	pthread_mutex_unlock(&sync_mtx);
 	
+	pthread_mutex_lock(&file_mtx);
 	xdf_close(xdf);
 	xdf = NULL;
+	pthread_mutex_unlock(&file_mtx);
+
 	return 1;
 }
 
