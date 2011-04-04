@@ -43,13 +43,8 @@ const struct channel_option* exg_opt = exg_options+1;
  *              Global variables                                          *
  *                                                                        * 
  **************************************************************************/
-#define BIOSEMI_SYSTEM	0
-#define EEGFILE_SYSTEM	1
-#define GTEC_SYSTEM	2
-#define NEUROSKY_SYSTEM	3
-int system_used = BIOSEMI_SYSTEM;
-const char* uifilename = NULL;
-const char* eegfilename = NULL;
+static const char* uifilename = NULL;
+static const char* devstring = NULL;
 
 pthread_t thread_id;
 pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -147,25 +142,6 @@ int get_labels_from_device(void)
 
 
 static
-struct eegdev* open_eeg_device(void)
-{
-	if (system_used == BIOSEMI_SYSTEM)
-		return egd_open_biosemi(64);
-	else if (system_used == GTEC_SYSTEM)
-		return egd_open_gtec();
-	else if (system_used == EEGFILE_SYSTEM)
-		return egd_open_file(eegfilename);
-	else if (system_used == NEUROSKY_SYSTEM)
-		return egd_open_neurosky(
-			"/dev/rfcomm0"
-			//"/homes/nbourdau/prog/eegview/build/neurosky.bin"
-			);
-	else
-		return NULL;
-}
-
-
-static
 void* display_bdf_error(void* arg)
 {
 	EEGPanel* pan = arg;
@@ -177,7 +153,7 @@ static
 int device_connection(void)
 {
 	int retval;
-	if (!(dev = open_eeg_device()))
+	if (!(dev = egd_open(devstring)))
 		return errno;
 
 	// Set the number of channels of the "All channels" values
@@ -466,10 +442,7 @@ int ToggleRecording(int start, void* user_data)
  **************************************************************************/
 enum option_index {
 	UIFILE,
-	BIOSEMI,
-	FILESRC,
-	NEUROSKY,
-	GTEC,
+	DEVSTRING,
 	SOFTWAREVERSION,
 	HELP,
 	NUM_OPTS
@@ -477,10 +450,7 @@ enum option_index {
 
 static struct option opt_str[] = {
 	[UIFILE] = {"ui-file", 1, NULL, 0},
-	[BIOSEMI] = {"biosemi", 0, &system_used, BIOSEMI_SYSTEM},
-	[FILESRC] = {"filesrc", 1, &system_used, EEGFILE_SYSTEM},
-	[NEUROSKY] = {"neurosky", 0, &system_used, NEUROSKY_SYSTEM},
-	[GTEC] = {"gtec", 0, &system_used, GTEC_SYSTEM},
+	[DEVSTRING] = {"device", 1, NULL, 0},
 	[SOFTWAREVERSION] = {"version", 0, NULL, 0},
 	[HELP] = {"help", 0, NULL, 'h'}
 
@@ -492,8 +462,6 @@ static void print_usage(const char* cmd)
 	fprintf(stdout,
 "Usage: %s [GTK+ OPTIONS...]\n"
 "            [--settings=FILE] [--ui-file=FILE]\n"
-"            [--eeg-set=EEG_SET] [--sensor-set=SENSOR_SET]\n"
-"            [--biosemi | --filesrc=FILE | --gtec | --neurosky]\n"
 "            [--version] [--help | -h]\n",
                cmd);
 	
@@ -523,8 +491,8 @@ int process_options(int argc, char* argv[])
 		case 0:
 			if (option_index == UIFILE)
 				uifilename = optarg;
-			else if (option_index == FILESRC)
-				eegfilename = optarg;
+			else if (option_index == DEVSTRING)
+				devstring = optarg;
 			else if (option_index == SOFTWAREVERSION)
 				print_version();
 			break;
