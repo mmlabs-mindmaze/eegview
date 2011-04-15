@@ -461,7 +461,7 @@ static void print_usage(const char* cmd)
 {
 	fprintf(stdout,
 "Usage: %s [GTK+ OPTIONS...]\n"
-"            [--settings=FILE] [--ui-file=FILE]\n"
+"            [--device=DEVSTRING] [--ui-file=FILE]\n"
 "            [--version] [--help | -h]\n",
                cmd);
 	
