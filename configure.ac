@@ -1,10 +1,9 @@
-m4_define([bin_release],0)
 m4_define([bin_current],0)
 m4_define([bin_revision],0)
 m4_define([bin_age],0)
 
 
-AC_INIT(eegview,[bin_release.bin_current.bin_age.bin_revision])
+AC_INIT(eegview,[bin_current.bin_revision],[nicolas.bourdaud@epfl.ch])
 AC_CONFIG_SRCDIR([src/eegview.c])
 #AC_CONFIG_LIBOBJ_DIR([lib])
 AC_CONFIG_MACRO_DIR([m4])
