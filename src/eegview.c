@@ -82,10 +82,15 @@ struct grpconf grp[] = {
 	
 static char **labels[2] = {NULL, NULL};
 
+#define NSCALE 2
+static const char* scale_labels[NSCALE] = {"25.0mV", "50.0mV"};
+static const float scale_values[NSCALE] = {25.0e3, 50.0e3};
+
 #define NTAB 3
-struct panel_tabconf tabconf[NTAB] = {
+static struct panel_tabconf tabconf[NTAB] = {
 	{.type = TABTYPE_SCOPE, "EEG"},
-	{.type = TABTYPE_BARGRAPH, "Offsets"},
+	{.type = TABTYPE_BARGRAPH, "Offsets", .nscales = NSCALE,
+	 .sclabels = scale_labels, .scales = scale_values},
 	{.type = TABTYPE_SCOPE, "Sensors"}
 };
 
