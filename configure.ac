@@ -32,7 +32,7 @@ case $host in
 esac
 
 AC_SEARCH_LIBS([pthread_create], [pthread posix4], [], AC_MSG_ERROR([The pthread library must be installed. Consider the installation of pthreads-win32 if on windows platform.]))
-AC_SEARCH_LIBS([eegpanel_create], [eegpanel], [], AC_MSG_ERROR([The eegpanel library must be installed.]))
+AC_SEARCH_LIBS([mcp_create], [mcpanel], [], AC_MSG_ERROR([The mcpanel library must be installed.]))
 AC_SEARCH_LIBS([xdf_open], [xdffileio], [], AC_MSG_ERROR([The xdffileio library must be installed.]))
 AC_SEARCH_LIBS([egd_start], [eegdev], [], AC_MSG_ERROR([The eegdev library must be installed.]))
 AC_SUBST(AM_LDFLAGS)

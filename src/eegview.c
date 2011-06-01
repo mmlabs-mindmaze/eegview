@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <eegpanel.h>
+#include <mcpanel.h>
 #include <eegdev.h>
 #include <stdlib.h>
 #include <string.h>
@@ -149,8 +149,8 @@ int get_labels_from_device(void)
 static
 void* display_bdf_error(void* arg)
 {
-	EEGPanel* pan = arg;
-	eegpanel_popup_message(pan, bdffile_message);
+	mcpanel* pan = arg;
+	mcp_popup_message(pan, bdffile_message);
 	return NULL;
 }
 
@@ -196,7 +196,7 @@ void* reading_thread(void* arg)
 {
 	float *eeg, *exg;
 	int32_t *tri;
-	EEGPanel* panel = arg;
+	mcpanel* panel = arg;
 	unsigned int neeg, nexg, ntri;
 	int run_acq, error, saving = 0;
 	ssize_t nsread;
@@ -233,8 +233,8 @@ void* reading_thread(void* arg)
 		nsread = egd_get_data(dev, NSAMPLES, eeg, exg, tri);
 		if (nsread < 0) {
 			error = errno;			
-			eegpanel_notify(panel, DISCONNECTED);
-			eegpanel_popup_message(panel, get_acq_msg(error));
+			mcp_notify(panel, DISCONNECTED);
+			mcp_popup_message(panel, get_acq_msg(error));
 			break;
 		}
 
@@ -259,10 +259,10 @@ void* reading_thread(void* arg)
 			}
 		}
 
-		eegpanel_add_samples(panel, 0, nsread, eeg);
-		eegpanel_add_samples(panel, 1, nsread, eeg);
-		eegpanel_add_samples(panel, 2, nsread, exg);
-		eegpanel_add_triggers(panel, nsread, (const uint32_t*)tri);
+		mcp_add_samples(panel, 0, nsread, eeg);
+		mcp_add_samples(panel, 1, nsread, eeg);
+		mcp_add_samples(panel, 2, nsread, exg);
+		mcp_add_triggers(panel, nsread, (const uint32_t*)tri);
 	}
 
 	if (saving)
@@ -279,16 +279,16 @@ void* reading_thread(void* arg)
 
 // Connection to the system 
 static
-int Connect(EEGPanel* panel)
+int Connect(mcpanel* panel)
 {
 	float fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 	const char*** clabels = (const char***)labels;
 
 	// Setup the panel with the settings
-	eegpanel_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
-	eegpanel_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
-	eegpanel_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
-	eegpanel_define_triggers(panel, 16, fs);
+	mcp_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
+	mcp_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
+	mcp_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
+	mcp_define_triggers(panel, 16, fs);
 
 	run_eeg = 1;
 	pthread_create(&thread_id, NULL, reading_thread, panel);
@@ -298,7 +298,7 @@ int Connect(EEGPanel* panel)
 
 
 static
-int Disconnect(EEGPanel* panel)
+int Disconnect(mcpanel* panel)
 {
 	(void)panel;
 
@@ -314,12 +314,12 @@ int Disconnect(EEGPanel* panel)
 static
 int SystemConnection(int start, void* user_data)
 {
-	EEGPanel* panel = user_data;
+	mcpanel* panel = user_data;
 	int retval;
 
 	retval = start ? Connect(panel) : Disconnect(panel);
 	if (retval)
-		eegpanel_popup_message(panel, get_acq_msg(retval));
+		mcp_popup_message(panel, get_acq_msg(retval));
 
 	return (retval < 0) ? 0 : 1;
 }
@@ -370,12 +370,12 @@ int setup_xdf_channel_group(int igrp)
 static
 int SetupRecording(void *user_data)
 {
-	EEGPanel *panel = user_data;
+	mcpanel *panel = user_data;
 	char *filename;
 	unsigned int j;
 	int fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 
-	filename = eegpanel_open_filename_dialog(panel,
+	filename = mcp_open_filename_dialog(panel,
 	                              "BDF files|*.bdf|*.BDF||Any files|*");
 	
 	// Check that user hasn't press cancel
@@ -407,7 +407,7 @@ int SetupRecording(void *user_data)
 	
 abort:
 	sprintf(bdffile_message,"XDF Error: %s",strerror(errno));
-	eegpanel_popup_message(panel, bdffile_message);
+	mcp_popup_message(panel, bdffile_message);
 	xdf_close(xdf);
 	return 0;
 }
@@ -518,7 +518,7 @@ int process_options(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-	EEGPanel* panel = NULL;
+	mcpanel* panel = NULL;
 	int retval = 0, retcode = EXIT_FAILURE;
 	struct PanelCb cb = {
 		.user_data = NULL,
@@ -529,7 +529,7 @@ int main(int argc, char* argv[])
 	};
 
 	// Process command line options
-	init_eegpanel_lib(&argc, &argv);
+	init_mcp_lib(&argc, &argv);
 	retval = process_options(argc, argv);
 	if (retval)
 		return (retval > 0) ? 0 : -retval;
@@ -540,17 +540,17 @@ int main(int argc, char* argv[])
 	}
 
 
-	panel = eegpanel_create(NULL, &cb, NTAB, tabconf);
+	panel = mcp_create(NULL, &cb, NTAB, tabconf);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
 		goto exit;
 	}
 	
 	// Run the panel
-	eegpanel_show(panel, 1);
-	eegpanel_run(panel, 0);
+	mcp_show(panel, 1);
+	mcp_run(panel, 0);
 
-	eegpanel_destroy(panel);
+	mcp_destroy(panel);
 	retcode = EXIT_SUCCESS;
 
 exit:
