@@ -529,7 +529,7 @@ int main(int argc, char* argv[])
 	};
 
 	// Process command line options
-	init_mcp_lib(&argc, &argv);
+	mcp_init_lib(&argc, &argv);
 	retval = process_options(argc, argv);
 	if (retval)
 		return (retval > 0) ? 0 : -retval;
