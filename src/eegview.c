@@ -332,7 +332,7 @@ int SystemConnection(int start, void* user_data)
 static
 int setup_xdf_channel_group(int igrp)
 {
-	char /*tmpstr[64],*/ label[32], transducter[128], unit[16];
+	char label[32], transducter[128], unit[16], filtering[128];
 	double mm[2];
 	unsigned int j;
 	int isint;
@@ -341,6 +341,7 @@ int setup_xdf_channel_group(int igrp)
 	egd_channel_info(dev, grp[igrp].sensortype, 0,
 			 EGD_UNIT, unit,
 			 EGD_TRANSDUCTER, transducter,
+			 EGD_PREFILTERING, filtering,
 			 EGD_MM_D, mm,
 			 EGD_ISINT, &isint,
 			 EGD_EOL);
@@ -353,6 +354,7 @@ int setup_xdf_channel_group(int igrp)
 		       XDF_CF_PMIN, mm[0],
 		       XDF_CF_PMAX, mm[1],
 		       XDF_CF_TRANSDUCTER, transducter,
+	               XDF_CF_PREFILTERING, filtering,
 		       XDF_CF_UNIT, unit,
 		       XDF_NOF);
 
