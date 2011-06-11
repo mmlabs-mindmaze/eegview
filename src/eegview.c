@@ -123,6 +123,7 @@ void free_labels(void)
 			free(labels[igrp][i]);
 
 		free(labels[igrp]);
+		labels[igrp] = NULL;
 	}
 }
 
@@ -281,8 +282,16 @@ void* reading_thread(void* arg)
 static
 int Connect(mcpanel* panel)
 {
-	float fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
-	const char*** clabels = (const char***)labels;
+	int retval;
+	const char*** clabels;
+	float fs;
+
+	retval = device_connection();
+	if (retval)
+		return retval;
+
+	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
+	clabels = (const char***)labels;
 
 	// Setup the panel with the settings
 	mcp_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
@@ -307,6 +316,7 @@ int Disconnect(mcpanel* panel)
 	pthread_mutex_unlock(&sync_mtx);
 
 	pthread_join(thread_id, NULL);
+	device_disconnection();
 	return 0;
 }
 
@@ -318,10 +328,12 @@ int SystemConnection(int start, void* user_data)
 	int retval;
 
 	retval = start ? Connect(panel) : Disconnect(panel);
-	if (retval)
+	if (retval) {
 		mcp_popup_message(panel, get_acq_msg(retval));
+		return 0;
+	}
 
-	return (retval < 0) ? 0 : 1;
+	return 1;
 }
 
 /**************************************************************************
@@ -536,11 +548,6 @@ int main(int argc, char* argv[])
 	if (retval)
 		return (retval > 0) ? 0 : -retval;
 	
-	if (device_connection()) {
-		perror("Device connection failed");
-		goto exit;
-	}
-
 
 	panel = mcp_create(NULL, &cb, NTAB, tabconf);
 	if (!panel) {
@@ -556,7 +563,6 @@ int main(int argc, char* argv[])
 	retcode = EXIT_SUCCESS;
 
 exit:
-	device_disconnection();
 	return retcode;
 }
 
