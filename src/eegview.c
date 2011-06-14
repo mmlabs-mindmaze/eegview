@@ -88,10 +88,10 @@ static const float scale_values[NSCALE] = {25.0e3, 50.0e3};
 
 #define NTAB 3
 static struct panel_tabconf tabconf[NTAB] = {
-	{.type = TABTYPE_SCOPE, "EEG"},
-	{.type = TABTYPE_BARGRAPH, "Offsets", .nscales = NSCALE,
+	{.type = TABTYPE_SCOPE, .name = "EEG"},
+	{.type = TABTYPE_BARGRAPH, .name = "Offsets", .nscales = NSCALE,
 	 .sclabels = scale_labels, .scales = scale_values},
-	{.type = TABTYPE_SCOPE, "Sensors"}
+	{.type = TABTYPE_SCOPE, .name = "Sensors"}
 };
 
 static int StopRecording(void* user_data);
