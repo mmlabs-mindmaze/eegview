@@ -336,6 +336,44 @@ int SystemConnection(int start, void* user_data)
 	return 1;
 }
 
+
+static char devinfo[1024];
+
+static
+void on_device_info(int id, void* data)
+{
+	(void)id;
+	unsigned int sampling_freq, eeg_nmax, sensor_nmax, trigger_nmax;
+	char *device_type, *device_id;
+	char prefiltering[128];
+	mcpanel* panel = data;
+
+	if (!run_eeg)
+		return;
+
+	egd_get_cap(dev, EGD_CAP_DEVTYPE, &device_type);
+	egd_get_cap(dev, EGD_CAP_DEVID, &device_id);
+	egd_get_cap(dev, EGD_CAP_FS, &sampling_freq);
+	eeg_nmax = egd_get_numch(dev, EGD_EEG);
+	sensor_nmax = egd_get_numch(dev, EGD_SENSOR);
+	trigger_nmax = egd_get_numch(dev, EGD_TRIGGER);
+	egd_channel_info(dev, EGD_EEG, 0, EGD_PREFILTERING, prefiltering);
+	
+	snprintf(devinfo, sizeof(devinfo)-1,
+	       "system info:\n\n"
+	       "device type: %s\n"
+	       "device model: %s\n"
+	       "sampling frequency: %u Hz\n"
+	       "num EEG channels: %u\n"
+	       "num sensor channels: %u\n"
+	       "num trigger channels: %u\n"
+	       "prefiltering: %s\n",
+	       device_type, device_id, sampling_freq,
+	       eeg_nmax, sensor_nmax, trigger_nmax, prefiltering);
+	
+	mcp_popup_message(panel, devinfo);	
+}
+
 /**************************************************************************
  *                                                                        *
  *              File recording callbacks                                  *
@@ -454,6 +492,8 @@ int ToggleRecording(int start, void* user_data)
 	return 1;
 }
 
+
+
 /**************************************************************************
  *                                                                        *
  *              Initialization of the application                         *
@@ -534,12 +574,19 @@ int main(int argc, char* argv[])
 {
 	mcpanel* panel = NULL;
 	int retval = 0, retcode = EXIT_FAILURE;
+	struct panel_button custom_button = {
+		.label = "device info",
+		.id = 0,
+		.callback = on_device_info
+	};
 	struct PanelCb cb = {
 		.user_data = NULL,
 		.system_connection = SystemConnection,
 		.setup_recording = SetupRecording,
 		.stop_recording = StopRecording,
 		.toggle_recording = ToggleRecording,
+		.nbutton = 1,
+		.custom_button = &custom_button
 	};
 
 	// Process command line options
