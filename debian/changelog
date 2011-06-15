@@ -1,4 +1,13 @@
-eegview (0.0-0alpha0) lucid; urgency=low
+eegview (0.0-0alpha1) lucid; urgency=low
+
+  * Use mcpanel library instead of eegpanel.
+  * Connect to device only when the connect button is pressed
+  * Save the prefiltering field into the file
+  * Add device info button
+
+ -- Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>  Fri, 27 May 2011 11:59:00 +0200
+
+eegview (0.0-0alpha1) lucid; urgency=low
 
   * Initial alpha.
 
