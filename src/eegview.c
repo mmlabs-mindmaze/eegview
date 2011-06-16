@@ -299,7 +299,9 @@ int Connect(mcpanel* panel)
 	mcp_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
 	mcp_define_triggers(panel, 16, fs);
 
+	pthread_mutex_lock(&sync_mtx);
 	run_eeg = 1;
+	pthread_mutex_unlock(&sync_mtx);
 	pthread_create(&thread_id, NULL, reading_thread, panel);
 	
 	return 0;
@@ -605,6 +607,8 @@ int main(int argc, char* argv[])
 	// Run the panel
 	mcp_show(panel, 1);
 	mcp_run(panel, 0);
+	if (run_eeg)
+		Disconnect(panel);
 
 	mcp_destroy(panel);
 	retcode = EXIT_SUCCESS;
