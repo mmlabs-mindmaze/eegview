@@ -1,9 +1,9 @@
 ACLOCAL_AMFLAGS=-I m4
-SUBDIRS = src
+SUBDIRS = src data
 
 EXTRA_DIST = debian/changelog debian/compat debian/control\
 		debian/copyright debian/docs		\
-		debian/rules
+		debian/rules debian/menu
 
 REMOVE_DISTDIR = \
   { test ! -d "$(distdir)" \

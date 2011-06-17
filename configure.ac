@@ -37,6 +37,6 @@ AC_SEARCH_LIBS([xdf_open], [xdffileio], [], AC_MSG_ERROR([The xdffileio library 
 AC_SEARCH_LIBS([egd_start], [eegdev], [], AC_MSG_ERROR([The eegdev library must be installed.]))
 AC_SUBST(AM_LDFLAGS)
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile data/Makefile data/eegview.desktop])
 AC_OUTPUT
 
