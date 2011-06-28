@@ -12,32 +12,6 @@
 # include <config.h>
 #endif
 
-//#include "configuration.h"
-
-/**************************************************************************
- *                                                                        *
- *              Channel selection structures                              *
- *                                                                        * 
- **************************************************************************/
-/*struct channel_option {
-	int type;
-	const char* string;
-	unsigned int numch;
-};
-
-struct channel_option eeg_options[] = {
-};
-#define NUM_EEG_OPTS (sizeof(eeg_options)/sizeof(eeg_options[0]))
-
-struct channel_option exg_options[] = {
-};
-#define NUM_EXG_OPTS (sizeof(exg_options)/sizeof(exg_options[0]))
-
-const struct channel_option* eeg_opt = eeg_options+2;
-const struct channel_option* exg_opt = exg_options+1;
-*/
-
-
 /**************************************************************************
  *                                                                        *
  *              Global variables                                          *
@@ -193,6 +167,7 @@ int device_disconnection(void)
 
 
 // EEG acquisition thread
+static
 void* reading_thread(void* arg)
 {
 	float *eeg, *exg;
