@@ -359,7 +359,8 @@ void on_device_info(int id, void* data)
 	eeg_nmax = egd_get_numch(dev, EGD_EEG);
 	sensor_nmax = egd_get_numch(dev, EGD_SENSOR);
 	trigger_nmax = egd_get_numch(dev, EGD_TRIGGER);
-	egd_channel_info(dev, EGD_EEG, 0, EGD_PREFILTERING, prefiltering);
+	egd_channel_info(dev, EGD_EEG, 0,
+			EGD_PREFILTERING, prefiltering, EGD_EOL);
 	
 	snprintf(devinfo, sizeof(devinfo)-1,
 	       "system info:\n\n"
