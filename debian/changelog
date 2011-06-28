@@ -1,3 +1,11 @@
+eegview (0.0-0alpha3) lucid; urgency=low
+
+  * bugfix: possible segmentation fault when opening device info
+  * supply an icon and desktop entry
+  * cleanup
+
+ -- Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>  Tue, 28 Jun 2011 14:07:48 +0200
+
 eegview (0.0-0alpha2) lucid; urgency=low
 
   * bugfix: unclean exit if panel closed before disconnection
