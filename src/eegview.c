@@ -574,7 +574,7 @@ int main(int argc, char* argv[])
 		return (retval > 0) ? 0 : -retval;
 	
 
-	panel = mcp_create(NULL, &cb, NTAB, tabconf);
+	panel = mcp_create(uifilename, &cb, NTAB, tabconf);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
 		goto exit;
