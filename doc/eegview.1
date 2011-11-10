@@ -1,0 +1,52 @@
+.\"Copyright 2011 (c) EPFL
+.TH EEGVIEW 1 2011 "EPFL" "EEGVIEW manpage"
+.SH NAME
+eegview - GUI program to display and record EEG data
+.SH SYNOPSIS
+.SY eegview 
+.OP \-\-device=\fIdevstring\fP
+.OP \-\-ui-file=\fIfile\fP
+.OP \-\-version
+.OP \-\-help|\-h
+.OP \fIGTK+ OPTIONS\fP
+.br
+.SH DESCRIPTION
+.LP
+\fBeegview\fP is a minimal scope to display and record various signal
+coming from a EEG acquisition device and others.
+.SH OPTIONS
+.TP 
+.B \-\-device=\fIdevstring\fP
+Specify the acquisition device and its configuration according to the
+format described in \fBeegdev-open-options\fP(5). Beware to double quote
+\fIdevstring\fP if you use '|' character in it. Otherwise the shell might
+misinterpret it as a pipe symbol.
+.
+.TP
+.B \-\-ui-file=\fIfile\fP
+Overrides the GUI description file the program should use to display the
+panel. This override has the priority over the UI file specified by the
+configuration file.
+.
+.TP
+.B \-\-version
+Display the version of the program as well as the version of the libraries
+it uses.
+.
+.TP
+.B \-\-help|\-h
+Display the command-line help
+.
+.LP
+\fBeegview\fP supports also the standards GTK+ options (\fIgtk-options\fP(7)).
+.SH FILES
+In the following, \fBxdg-config-home\fP refers to the XDG compliant user
+config folder. So it corresponds to the XDG_CONFIG_HOME environment variable
+if set, ~/.config/ otherwise.
+.TP
+\fBxdg-config-home\fP/eegview.conf
+Default settings of the panel. An example of file can be found in the
+documentation folder.
+.SH "SEE ALSO"
+.BR eegdev-open-options (5),
+.BR gtk-options (7)
