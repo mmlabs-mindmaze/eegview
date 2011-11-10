@@ -1,5 +1,0 @@
-?package(eegview): \
-   needs="X11" \
-   section="Applications/Science/Data Analysis" \
-   title="Eegview" \
-   command="/usr/bin/eegview"
