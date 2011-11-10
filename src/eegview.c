@@ -564,7 +564,8 @@ int main(int argc, char* argv[])
 		.stop_recording = StopRecording,
 		.toggle_recording = ToggleRecording,
 		.nbutton = 1,
-		.custom_button = &custom_button
+		.custom_button = &custom_button,
+		.confname = PACKAGE_NAME
 	};
 
 	// Process command line options
