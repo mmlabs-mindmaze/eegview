@@ -173,13 +173,12 @@ void* reading_thread(void* arg)
 	float *eeg, *exg;
 	int32_t *tri;
 	mcpanel* panel = arg;
-	unsigned int neeg, nexg, ntri;
+	unsigned int neeg, nexg;
 	int run_acq, error, saving = 0;
 	ssize_t nsread;
 
 	neeg = grp[0].nch;
 	nexg = grp[1].nch;
-	ntri = grp[2].nch;
 
 	eeg = neeg ? calloc(neeg*NSAMPLES, sizeof(*eeg)) : NULL;
 	exg = nexg ? calloc(nexg*NSAMPLES, sizeof(*exg)) : NULL;
