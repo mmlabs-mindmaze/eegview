@@ -2,6 +2,6 @@
 Encoding=UTF-8
 Name=EEGView
 Exec=eegview
-Icon=eegview
+Icon=utilities-system-monitor
 Type=Application
 Categories=Science;Education;GTK;
