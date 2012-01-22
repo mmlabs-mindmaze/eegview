@@ -1,0 +1,271 @@
+2012-01-22  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* AUTHORS, configure.ac, src/eegview.c: Update the copyright
+
+2012-01-22  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* data/Makefile.am: Cleanup tarball generation
+
+2012-01-22  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* data/Makefile.am, data/eegview.desktop.in, data/eegview.svg: Don't
+	use lab icon (cannot be used under LGPL)
+
+2012-01-21  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* src/eegview.c: Fix warnings
+
+2011-11-10  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* Makefile.am, configure.ac, doc/Makefile.am, doc/eegview.1: Adds a
+	eegview minimal manpage
+
+2011-11-10  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* data/Makefile.am, data/eegview.conf, src/eegview.c: Supports for
+	eegview.conf configuration file
+
+2011-11-01  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* src/eegview.c: bugfix: --ui-file opetion not taken into account
+
+2011-11-10  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+
+	* Makefile.am, debian/changelog, debian/compat, debian/control,
+	debian/copyright, debian/docs, debian/menu, debian/rules: Remove
+	debian packaging from main development
+
+2011-06-28  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* debian/changelog: alpha3 release
+
+2011-06-28  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: cleanup commented lines
+
+2011-06-28  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: bugfix: possible segfault in device info
+
+2011-06-17  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* Makefile.am, configure.ac, data/Makefile.am,
+	data/eegview.desktop.in, data/eegview.svg, debian/menu,
+	src/Makefile.am: Install icon and desktop entry
+
+2011-06-17  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* eegpanel.ui, settings.ini, src/fakeact2.c: Clean up old and
+	unnecessary files
+
+2011-06-16  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* debian/changelog, src/eegview.c: bugfix: unclean exit when closed
+	before disconnection (alpha2)
+
+2011-06-15  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* debian/changelog, debian/control: New version: alpha1
+
+2011-06-15  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Add device info button
+
+2011-06-14  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Reflect changes in mcpanel with tabconf
+
+2011-06-11  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Connect to eeg device only when connect is pressed
+
+2011-06-09  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Add prefiltering field in the recorded file
+
+2011-06-04  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: init_mcp_lib => mcp_init_lib
+
+2011-06-01  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* configure.ac, src/eegview.c: Use mcpanel library
+
+2011-05-30  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Set offsets scales to 25mV and 50mV only
+
+2011-05-27  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* Makefile.am, configure.ac, debian/changelog, debian/compat,
+	debian/control, debian/copyright, debian/docs, debian/rules: Add
+	debian packaging and use the correct version scheme
+
+2011-04-15  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Make usage mention the correct options
+
+2011-04-04  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Use new eegdev API egd_open
+
+2011-02-14  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: bugfix: fix race condition when closing file
+
+2011-01-14  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Update usage of egd_get_cap and egd_get_numch
+
+2010-12-07  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* : commit fe95946a9449a997e217dbc9fdb4c2605cfc601c Author: Nicolas
+	Bourdaud <nicolas.bourdaud@epfl.ch> Date:   Tue Dec 7 18:10:45 2010
+	+0100
+
+2010-11-26  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Small cleanups
+
+2010-11-26  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* configure.ac, src/Makefile.am, src/configuration.c,
+	src/configuration.h, src/eegview.c: Adapt eegview to the new panel
+	(tab separated)
+
+2010-11-11  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Reenable the use of triggers and fix the biosemi
+	open func
+
+2010-11-03  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Get information from device (use egd_chinfo)
+
+2010-10-18  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: externalize device connection from panel loop
+
+2010-10-18  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Add neurosky support
+
+2010-10-01  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* configure.ac, src/eegview.c: Check that the system support the
+	requested number of channel
+
+2010-10-01  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* configure.ac, src/configuration.c, src/configuration.h,
+	src/eegview.c: Switch to eegdev library Use of eegdev library now. As a consequence, the commandline options
+	handling code has been changed to specify the type of EEG device to
+	be used.
+
+2010-08-02  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Update to the new xdffileio API
+
+2010-07-21  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* configure.ac: Remove unnecessary use of libtool
+
+2010-06-29  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* configure.ac, src/eegview.c: Use of xdffileio library instead of
+	bdffileio
+
+2010-03-13  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c, src/fakeact2.c: Fix the bug of recording (provide a
+	way to fake eeg as well)
+
+2009-12-16  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Add popup message on bdf file error
+
+2009-12-09  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Fix the channel specification when creating the BDF
+
+2009-12-09  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* configure.ac, src/Makefile.am, src/configuration.c,
+	src/configuration.h, src/eegview.c: Add configuration file
+
+2009-12-07  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Integrate change of eegpanel_create
+
+2009-11-09  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* src/eegview.c: Fix bux in the creation of panel: DO NOT set
+	user_data to a junk value git-svn-id:
+
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@154 3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-11-09  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* src/eegview.c: Fix a bug the the creation of BDF file git-svn-id:
+
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@153 3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-11-09  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* src/eegview.c: stop the acquisition loop in case of acquisition
+	failure git-svn-id:
+
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@152 3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-08-21  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* src/eegview.c: clean synchronization git-svn-id:
+
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@125 3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-08-18  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* src/eegview.c: reflect change of eegpanel git-svn-id:
+
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@117 3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-08-03  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* src/eegview.c: Connect toggle recording function git-svn-id:
+
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@101 3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-08-03  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* src/eegview.c: Fix a bug in the exg-set cmdline option. Handle
+	disconnection git-svn-id:
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@99
+	3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-07-09  bourdaud <bourdaud@3b4714c8-b19d-487d-9711-26c957be2895>
+
+	* : Process the channel set options and fix a bug in specification
+	of channels needed in Connect function git-svn-id:
+	https://svn.epfl.ch/svn/activetwotools/trunk/applications/eegview@27
+	3b4714c8-b19d-487d-9711-26c957be2895
+
+2009-07-07  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Process the channel set options and fix a bug in
+	specification of channels needed in Connect function
+
+2009-07-06  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* src/eegview.c: Fix: initialize chann to 0 and plug StopRecording
+	callback
+
+2009-07-06  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* AUTHORS, COPYING, ChangeLog, Makefile, Makefile.am, NEWS, README,
+	config/.dummy, configure.ac, m4/.dummy, main.c, src/Makefile.am,
+	src/eegview.c: GNU package created
+
+2009-07-03  Nicolas Bourdaud <nicolas.bourdaud@epfl.ch>
+
+	* Initial commit: bdf recording doesn't work yet
+
