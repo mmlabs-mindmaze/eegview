@@ -193,6 +193,11 @@ void* reading_thread(void* arg)
 	unsigned int neeg, nexg;
 	int run_acq, error, saving = 0;
 	ssize_t nsread;
+	float fs;
+	unsigned int counter = 0;
+	char text_label[32];
+	int result;
+	struct mcp_widget* mcp_widget_s;
 
 	neeg = grp[0].nch;
 	nexg = grp[1].nch;
@@ -202,6 +207,7 @@ void* reading_thread(void* arg)
 	tri = calloc(NSAMPLES, sizeof(*tri));
 	
 	egd_start(dev);
+	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 	while (1) {
 		
 		// update control flags
@@ -249,12 +255,19 @@ void* reading_thread(void* arg)
 				pthread_create(&thid, &attr, display_bdf_error, panel);
 				pthread_attr_destroy(&attr);
 			}
+
+			// display how long we are recording
+			counter++;
+			sprintf(text_label, "%d seconds", (int)((counter*NSAMPLES)/fs));
+			mcp_widget_s = mcp_get_widget(panel, "file_length_label");
+			result = mcp_widget_set_label(mcp_widget_s, text_label);
 		}
 
 		mcp_add_samples(panel, 0, nsread, eeg);
 		mcp_add_samples(panel, 1, nsread, eeg);
 		mcp_add_samples(panel, 2, nsread, exg);
 		mcp_add_triggers(panel, nsread, (const uint32_t*)tri);
+
 	}
 
 	if (saving)
