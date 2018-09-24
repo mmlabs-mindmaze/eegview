@@ -1,0 +1,9 @@
+general:
+    name: eegview
+    version: 0.1
+    maintainer: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+    url: ssh://intranet.mindmaze.ch:29418/eegview
+    description: |
+      eegview is a small program to display/record EEG signals. It is
+      particularly useful for setting up quickly the acquisition part of a
+      offline protocol.

@@ -1,5 +1,5 @@
 m4_define([bin_current],0)
-m4_define([bin_revision],0)
+m4_define([bin_revision],1)
 m4_define([bin_age],0)
 
 
