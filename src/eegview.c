@@ -24,6 +24,7 @@
 #include <xdfio.h>
 #include <errno.h>
 #include <getopt.h>
+#include <mmlib.h>
 
 #if HAVE_CONFIG_H
 # include <config.h>
@@ -429,22 +430,47 @@ int setup_xdf_channel_group(int igrp)
 }
 
 static
+void create_file(mcpanel* panel)
+{
+	const char *fileext, *dot;
+	char *filename;
+
+	xdf = NULL;
+
+	filename = mcp_open_filename_dialog(panel,
+	                              "GDF files|*.gdf|*.GDF||BDF files|*.bdf|*.BDF||Any files|*");
+
+	// Check that user hasn't pressed cancel
+	if (filename == NULL)
+		return ;
+
+	// Create the BDF/GDF file
+	dot = strrchr(filename, '.');
+	if (!dot || dot == filename) {
+		fprintf(stderr, "No file extension has been provided! Defaulting to GDF\n");
+		fileext = "gdf";
+	} else {
+		fileext = dot + 1;
+	}
+
+	if (mmstrcasecmp(fileext, "bdf")==0) {
+		xdf = xdf_open(filename, XDF_WRITE, XDF_BDF);
+	} else if (mmstrcasecmp(fileext, "gdf")==0) {
+		xdf = xdf_open(filename, XDF_WRITE, XDF_GDF2);
+	} else {
+		fprintf(stderr, "File extension should be either BDF or GDF! Defaulting to GDF\n");
+		xdf = xdf_open(filename, XDF_WRITE, XDF_GDF2);
+	}
+}
+
+static
 int SetupRecording(void *user_data)
 {
 	mcpanel *panel = user_data;
-	char *filename;
 	unsigned int j;
 	int fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 
-	filename = mcp_open_filename_dialog(panel,
-	                              "BDF files|*.bdf|*.BDF||Any files|*");
-	
-	// Check that user hasn't press cancel
-	if (filename == NULL)
-		return 0;
-
-	// Create the BDF file
-	xdf = xdf_open(filename, XDF_WRITE, XDF_BDF);
+	create_file(panel);
 	if (!xdf) 
 		goto abort;
 
