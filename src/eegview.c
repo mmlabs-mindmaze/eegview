@@ -3,6 +3,8 @@
     Laboratory CNBI (Chair in Non-Invasive Brain-Machine Interface)
     Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 
+    Copyright (C) 2017-2018  MindMaze SA
+
     This program is free software: you can redistribute it and/or modify
     modify it under the terms of the version 3 of the GNU General Public
     License as published by the Free Software Foundation.
@@ -15,6 +17,10 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#if HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <stdio.h>
 #include <mcpanel.h>
 #include <eegdev.h>
@@ -25,10 +31,10 @@
 #include <errno.h>
 #include <getopt.h>
 #include <mmlib.h>
+#include <mmerrno.h>
 
-#if HAVE_CONFIG_H
-# include <config.h>
-#endif
+#include "event-tracker.h"
+
 
 enum {
 	REC_PAUSE = 0,
@@ -41,6 +47,7 @@ struct rectimer_data {
 	float fs;
 	int last_displayed_rectime;
 };
+
 
 /**************************************************************************
  *                                                                        *
@@ -55,10 +62,13 @@ pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t file_mtx = PTHREAD_MUTEX_INITIALIZER;
 struct eegdev* dev = NULL;
 struct xdf* xdf = NULL;
+int skip_event_recording = 1;
 int run_eeg = 0;
 int record_file = 0;
 static int reset_record_counter = 0;
 #define NSAMPLES	32
+
+struct event_tracker evttrk;
 
 size_t strides[3];
 struct grpconf grp[] = {
@@ -244,6 +254,40 @@ int device_disconnection(void)
 }
 
 
+/**
+ * record_event() - add events to xdffile
+ * @evt_stk:    stack of event to store in file
+ * @fs:         sampling freqency of acquisition
+ * @diff_idx:   index of acquired sample when recording started
+ */
+static
+int record_event(struct event_stack* evt_stk, float fs, int diff_idx)
+{
+	int e, evttype;
+	double onset;
+
+	if (skip_event_recording)
+		return 0;
+
+	for (e = 0; e < evt_stk->nevent; e++) {
+		// Get XDF event type
+		evttype = xdf_add_evttype(xdf, evt_stk->events[e].type, NULL);
+		if (evttype == -1) {
+			mm_raise_from_errno("xdf_add_evttype() failed");
+			return -1;
+		}
+
+		// Compute onset in floating point (in seconds) since
+		// begining of recording
+		onset = (evt_stk->events[e].pos + diff_idx) * fs;
+		if (xdf_add_event(xdf, evttype, onset, 0.0f)) {
+			mm_raise_from_errno("xdf_add_event(..., %d, ...) failed", evttype);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 // EEG acquisition thread
 static
 void* reading_thread(void* arg)
@@ -253,9 +297,11 @@ void* reading_thread(void* arg)
 	mcpanel* panel = arg;
 	unsigned int neeg, nexg, ntri;
 	int run_acq, error, saving = 0;
-	int nsread, total_rec;
+	int nsread, total_rec, total_read, rec_start;
 	float fs;
 	struct rectimer_data rectimer;
+	struct event_tracker* trk = &evttrk;
+	struct event_stack* evt_stk;
 
 	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 	rectimer_data_init(&rectimer, panel, fs);
@@ -269,9 +315,12 @@ void* reading_thread(void* arg)
 	tri = ntri ? calloc(ntri*NSAMPLES, sizeof(*tri)) : NULL;
 
 	egd_start(dev);
+	total_read = 0;
+	total_rec = 0;
+	rec_start = 0;
 
 	while (1) {
-		
+
 		// update control flags
 		pthread_mutex_lock(&sync_mtx);
 		run_acq = run_eeg;
@@ -283,8 +332,10 @@ void* reading_thread(void* arg)
 				pthread_mutex_unlock(&file_mtx);
 			saving = record_file;
 
-			if (saving == REC_RESET_AND_SAVING)
+			if (saving == REC_RESET_AND_SAVING) {
 				total_rec = 0;
+				rec_start = total_read;
+			}
 		}
 		pthread_mutex_unlock(&sync_mtx);
 
@@ -300,6 +351,9 @@ void* reading_thread(void* arg)
 			mcp_popup_message(panel, get_acq_msg(error));
 			break;
 		}
+		total_read += nsread;
+		event_tracker_update_ns_read(trk, total_read);
+		evt_stk = event_tracker_swap_eventstack(trk);
 
 		// Write samples on file
 		if (saving != REC_PAUSE) {
@@ -319,6 +373,7 @@ void* reading_thread(void* arg)
 				pthread_create(&thid, &attr, display_bdf_error, panel);
 				pthread_attr_destroy(&attr);
 			}
+			record_event(evt_stk, fs, rec_start);
 
 			total_rec += nsread;
 
@@ -326,6 +381,7 @@ void* reading_thread(void* arg)
 			rectimer_data_update(&rectimer, total_rec);
 		}
 
+		mcp_add_events(panel, 0, evt_stk->nevent, evt_stk->events);
 		mcp_add_samples(panel, 0, nsread, eeg);
 		mcp_add_samples(panel, 1, nsread, eeg);
 		mcp_add_samples(panel, 2, nsread, exg);
@@ -345,7 +401,8 @@ void* reading_thread(void* arg)
 	return 0;
 }
 
-// Connection to the system 
+
+// Connection to the system
 static
 int Connect(mcpanel* panel)
 {
@@ -374,7 +431,10 @@ int Connect(mcpanel* panel)
 	run_eeg = 1;
 	pthread_mutex_unlock(&sync_mtx);
 	pthread_create(&thread_id, NULL, reading_thread, panel);
-	
+
+	// Network event connection and reception
+	event_tracker_init(&evttrk, fs);
+
 	return 0;
 }
 
@@ -384,12 +444,17 @@ int Disconnect(mcpanel* panel)
 {
 	(void)panel;
 
+	StopRecording(NULL);
+
 	pthread_mutex_lock(&sync_mtx);
 	run_eeg = 0;
 	pthread_mutex_unlock(&sync_mtx);
 
 	pthread_join(thread_id, NULL);
 	device_disconnection();
+
+	event_tracker_deinit(&evttrk);
+
 	return 0;
 }
 
@@ -532,6 +597,7 @@ int SetupRecording(void *user_data)
 {
 	mcpanel *panel = user_data;
 	unsigned int j;
+	int fileformat = -1;
 	int fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 
 	create_file(panel);
@@ -554,6 +620,9 @@ int SetupRecording(void *user_data)
 	if (xdf_prepare_transfer(xdf))
 		goto abort;
 
+	//Store file type for later use
+	xdf_get_conf(xdf, XDF_F_FILEFMT, &fileformat, XDF_NOF);
+	skip_event_recording = (fileformat != XDF_GDF2);
 	return 1;
 	
 abort:
