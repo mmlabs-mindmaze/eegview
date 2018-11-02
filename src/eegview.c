@@ -72,7 +72,7 @@ struct grpconf grp[] = {
 	}
 };
 	
-static char **labels[2] = {NULL, NULL};
+static char **labels[3] = {NULL, NULL, NULL};
 
 #define NSCALE 2
 static const char* scale_labels[NSCALE] = {"25.0mV", "50.0mV"};
@@ -108,7 +108,7 @@ void free_labels(void)
 {
 	unsigned int igrp, i;
 
-	for (igrp=0; igrp<2; igrp++) {
+	for (igrp=0; igrp<3; igrp++) {
 		if (labels[igrp] == NULL)
 			continue;
 		for (i=0; i<grp[igrp].nch; i++) 
@@ -126,7 +126,7 @@ int get_labels_from_device(void)
 	int type;
 
 	// Allocate and copy each labels
-	for (igrp=0; igrp<2; igrp++) {
+	for (igrp=0; igrp<3; igrp++) {
 		labels[igrp] = malloc(grp[igrp].nch * sizeof(char*));
 		type = grp[igrp].sensortype;
 		for (i=0; i<grp[igrp].nch; i++) {
@@ -157,7 +157,8 @@ int device_connection(void)
 	// Set the number of channels of the "All channels" values
 	grp[0].nch = egd_get_numch(dev, EGD_EEG);
 	grp[1].nch = egd_get_numch(dev, EGD_SENSOR);
-	grp[2].nch = egd_get_numch(dev, EGD_TRIGGER) ? 1 : 0;
+	grp[2].nch = egd_get_numch(dev, EGD_TRIGGER);
+
 	strides[0] = grp[0].nch * sizeof(float);
 	strides[1] = grp[1].nch * sizeof(float);
 	strides[2] = grp[2].nch * sizeof(int32_t);
@@ -191,7 +192,7 @@ void* reading_thread(void* arg)
 	float *eeg, *exg;
 	int32_t *tri;
 	mcpanel* panel = arg;
-	unsigned int neeg, nexg;
+	unsigned int neeg, nexg, ntri;
 	int run_acq, error, saving = 0;
 	ssize_t nsread;
 	float fs;
@@ -202,11 +203,12 @@ void* reading_thread(void* arg)
 
 	neeg = grp[0].nch;
 	nexg = grp[1].nch;
+	ntri = grp[2].nch;
 
 	eeg = neeg ? calloc(neeg*NSAMPLES, sizeof(*eeg)) : NULL;
 	exg = nexg ? calloc(nexg*NSAMPLES, sizeof(*exg)) : NULL;
-	tri = calloc(NSAMPLES, sizeof(*tri));
-	
+	tri = ntri ? calloc(ntri*NSAMPLES, sizeof(*tri)) : NULL;
+
 	egd_start(dev);
 	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 	// Query the objects of the GUI that are needed
@@ -292,6 +294,7 @@ int Connect(mcpanel* panel)
 	int retval;
 	const char*** clabels;
 	float fs;
+	unsigned int ntri;
 
 	retval = device_connection();
 	if (retval)
@@ -300,11 +303,14 @@ int Connect(mcpanel* panel)
 	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 	clabels = (const char***)labels;
 
+	// Retrieve the number of trigger channels
+	ntri = grp[2].nch;
+
 	// Setup the panel with the settings
 	mcp_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
 	mcp_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
 	mcp_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
-	mcp_define_triggers(panel, 16, fs);
+	mcp_define_trigg_input(panel, 16, ntri, fs, clabels[2]);
 
 	pthread_mutex_lock(&sync_mtx);
 	run_eeg = 1;
