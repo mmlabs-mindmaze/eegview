@@ -30,6 +30,18 @@
 # include <config.h>
 #endif
 
+enum {
+	REC_PAUSE = 0,
+	REC_SAVING,
+	REC_RESET_AND_SAVING,
+};
+
+struct rectimer_data {
+	struct mcp_widget* timerlabel;
+	float fs;
+	int last_displayed_rectime;
+};
+
 /**************************************************************************
  *                                                                        *
  *              Global variables                                          *
@@ -45,6 +57,7 @@ struct eegdev* dev = NULL;
 struct xdf* xdf = NULL;
 int run_eeg = 0;
 int record_file = 0;
+static int reset_record_counter = 0;
 #define NSAMPLES	32
 
 size_t strides[3];
@@ -98,6 +111,52 @@ const char* get_acq_msg(int error)
 }
 
 static char bdffile_message[128];
+
+
+/**************************************************************************
+ *                                                                        *
+ *              recording time display                                    *
+ *                                                                        *
+ **************************************************************************/
+/**
+ * rectimer_data_init() - initialize data for updating recorded time label
+ * @data:       rectimer_data structure to initialize
+ * @panel:      mcpanel instance that should contain the label
+ * @fs:         sampling frequency of the recorded signal
+ */
+static
+void rectimer_data_init(struct rectimer_data* data, mcpanel* panel, float fs)
+{
+	*data = (struct rectimer_data) {
+		.fs = fs,
+		.timerlabel = mcp_get_widget(panel, "file_length_label"),
+		.last_displayed_rectime = 0,
+	};
+}
+
+
+/**
+ * rectimer_data_update() - update recorded time label in GUI
+ * @data:       initialized rectimer_data structure
+ * @total_rec:  number of sample since file started to be recorded
+ */
+static
+void rectimer_data_update(struct rectimer_data* data, ssize_t total_rec)
+{
+	int rectime;
+	char text_label[32];
+
+	rectime = total_rec / data->fs;
+	if (rectime == data->last_displayed_rectime)
+		return;
+
+	sprintf(text_label, "%d", rectime);
+	mcp_widget_set_label(data->timerlabel, text_label);
+
+	data->last_displayed_rectime = rectime;
+}
+
+
 /**************************************************************************
  *                                                                        *
  *              Acquition system callbacks                                *
@@ -194,12 +253,12 @@ void* reading_thread(void* arg)
 	mcpanel* panel = arg;
 	unsigned int neeg, nexg, ntri;
 	int run_acq, error, saving = 0;
-	ssize_t nsread;
+	int nsread, total_rec;
 	float fs;
-	unsigned int counter = 0;
-	char text_label[32];
-	int result;
-	struct mcp_widget* timerlabel;
+	struct rectimer_data rectimer;
+
+	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
+	rectimer_data_init(&rectimer, panel, fs);
 
 	neeg = grp[0].nch;
 	nexg = grp[1].nch;
@@ -210,9 +269,6 @@ void* reading_thread(void* arg)
 	tri = ntri ? calloc(ntri*NSAMPLES, sizeof(*tri)) : NULL;
 
 	egd_start(dev);
-	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
-	// Query the objects of the GUI that are needed
-	timerlabel = mcp_get_widget(panel, "file_length_label");
 
 	while (1) {
 		
@@ -221,11 +277,14 @@ void* reading_thread(void* arg)
 		run_acq = run_eeg;
 		if (saving != record_file) {
 			// report write status back
-			if (record_file)
+			if (record_file != REC_PAUSE)
 				pthread_mutex_lock(&file_mtx);
 			else
 				pthread_mutex_unlock(&file_mtx);
 			saving = record_file;
+
+			if (saving == REC_RESET_AND_SAVING)
+				total_rec = 0;
 		}
 		pthread_mutex_unlock(&sync_mtx);
 
@@ -242,9 +301,8 @@ void* reading_thread(void* arg)
 			break;
 		}
 
-		
 		// Write samples on file
-		if (saving) {
+		if (saving != REC_PAUSE) {
 			if (xdf_write(xdf, nsread, eeg, exg, tri) < 0) {
 				pthread_attr_t attr;
 				pthread_t thid;
@@ -262,10 +320,10 @@ void* reading_thread(void* arg)
 				pthread_attr_destroy(&attr);
 			}
 
+			total_rec += nsread;
+
 			// display how long we are recording
-			counter++;
-			sprintf(text_label, "%d seconds", (int)((counter*NSAMPLES)/fs));
-			result = mcp_widget_set_label(timerlabel, text_label);
+			rectimer_data_update(&rectimer, total_rec);
 		}
 
 		mcp_add_samples(panel, 0, nsread, eeg);
@@ -527,9 +585,20 @@ static
 int ToggleRecording(int start, void* user_data)
 {
 	(void)user_data;
+
 	pthread_mutex_lock(&sync_mtx);
-	record_file = start;
+
+	record_file = start ? REC_PAUSE : REC_SAVING;
+
+	// If it is the first toggle_recording after recording setup, we
+	// must reset the counters.
+	if (reset_record_counter && start) {
+		record_file = REC_RESET_AND_SAVING;
+		reset_record_counter = 0;
+	}
+
 	pthread_mutex_unlock(&sync_mtx);
+
 	return 1;
 }
 
