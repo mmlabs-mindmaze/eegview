@@ -3,6 +3,8 @@
     Laboratory CNBI (Chair in Non-Invasive Brain-Machine Interface)
     Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 
+    Copyright (C) 2017-2018  MindMaze SA
+
     This program is free software: you can redistribute it and/or modify
     modify it under the terms of the version 3 of the GNU General Public
     License as published by the Free Software Foundation.
@@ -15,6 +17,10 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#if HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <stdio.h>
 #include <mcpanel.h>
 #include <eegdev.h>
@@ -24,10 +30,24 @@
 #include <xdfio.h>
 #include <errno.h>
 #include <getopt.h>
+#include <mmlib.h>
+#include <mmerrno.h>
 
-#if HAVE_CONFIG_H
-# include <config.h>
-#endif
+#include "event-tracker.h"
+
+
+enum {
+	REC_PAUSE = 0,
+	REC_SAVING,
+	REC_RESET_AND_SAVING,
+};
+
+struct rectimer_data {
+	struct mcp_widget* timerlabel;
+	float fs;
+	int last_displayed_rectime;
+};
+
 
 /**************************************************************************
  *                                                                        *
@@ -42,9 +62,13 @@ pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t file_mtx = PTHREAD_MUTEX_INITIALIZER;
 struct eegdev* dev = NULL;
 struct xdf* xdf = NULL;
+int skip_event_recording = 1;
 int run_eeg = 0;
 int record_file = 0;
+static int reset_record_counter = 0;
 #define NSAMPLES	32
+
+struct event_tracker evttrk;
 
 size_t strides[3];
 struct grpconf grp[] = {
@@ -71,7 +95,7 @@ struct grpconf grp[] = {
 	}
 };
 	
-static char **labels[2] = {NULL, NULL};
+static char **labels[3] = {NULL, NULL, NULL};
 
 #define NSCALE 2
 static const char* scale_labels[NSCALE] = {"25.0mV", "50.0mV"};
@@ -97,6 +121,52 @@ const char* get_acq_msg(int error)
 }
 
 static char bdffile_message[128];
+
+
+/**************************************************************************
+ *                                                                        *
+ *              recording time display                                    *
+ *                                                                        *
+ **************************************************************************/
+/**
+ * rectimer_data_init() - initialize data for updating recorded time label
+ * @data:       rectimer_data structure to initialize
+ * @panel:      mcpanel instance that should contain the label
+ * @fs:         sampling frequency of the recorded signal
+ */
+static
+void rectimer_data_init(struct rectimer_data* data, mcpanel* panel, float fs)
+{
+	*data = (struct rectimer_data) {
+		.fs = fs,
+		.timerlabel = mcp_get_widget(panel, "file_length_label"),
+		.last_displayed_rectime = 0,
+	};
+}
+
+
+/**
+ * rectimer_data_update() - update recorded time label in GUI
+ * @data:       initialized rectimer_data structure
+ * @total_rec:  number of sample since file started to be recorded
+ */
+static
+void rectimer_data_update(struct rectimer_data* data, ssize_t total_rec)
+{
+	int rectime;
+	char text_label[32];
+
+	rectime = total_rec / data->fs;
+	if (rectime == data->last_displayed_rectime)
+		return;
+
+	sprintf(text_label, "%d", rectime);
+	mcp_widget_set_label(data->timerlabel, text_label);
+
+	data->last_displayed_rectime = rectime;
+}
+
+
 /**************************************************************************
  *                                                                        *
  *              Acquition system callbacks                                *
@@ -107,7 +177,7 @@ void free_labels(void)
 {
 	unsigned int igrp, i;
 
-	for (igrp=0; igrp<2; igrp++) {
+	for (igrp=0; igrp<3; igrp++) {
 		if (labels[igrp] == NULL)
 			continue;
 		for (i=0; i<grp[igrp].nch; i++) 
@@ -125,7 +195,7 @@ int get_labels_from_device(void)
 	int type;
 
 	// Allocate and copy each labels
-	for (igrp=0; igrp<2; igrp++) {
+	for (igrp=0; igrp<3; igrp++) {
 		labels[igrp] = malloc(grp[igrp].nch * sizeof(char*));
 		type = grp[igrp].sensortype;
 		for (i=0; i<grp[igrp].nch; i++) {
@@ -156,7 +226,8 @@ int device_connection(void)
 	// Set the number of channels of the "All channels" values
 	grp[0].nch = egd_get_numch(dev, EGD_EEG);
 	grp[1].nch = egd_get_numch(dev, EGD_SENSOR);
-	grp[2].nch = egd_get_numch(dev, EGD_TRIGGER) ? 1 : 0;
+	grp[2].nch = egd_get_numch(dev, EGD_TRIGGER);
+
 	strides[0] = grp[0].nch * sizeof(float);
 	strides[1] = grp[1].nch * sizeof(float);
 	strides[2] = grp[2].nch * sizeof(int32_t);
@@ -183,6 +254,40 @@ int device_disconnection(void)
 }
 
 
+/**
+ * record_event() - add events to xdffile
+ * @evt_stk:    stack of event to store in file
+ * @fs:         sampling freqency of acquisition
+ * @diff_idx:   index of acquired sample when recording started
+ */
+static
+int record_event(struct event_stack* evt_stk, float fs, int diff_idx)
+{
+	int e, evttype;
+	double onset;
+
+	if (skip_event_recording)
+		return 0;
+
+	for (e = 0; e < evt_stk->nevent; e++) {
+		// Get XDF event type
+		evttype = xdf_add_evttype(xdf, evt_stk->events[e].type, NULL);
+		if (evttype == -1) {
+			mm_raise_from_errno("xdf_add_evttype() failed");
+			return -1;
+		}
+
+		// Compute onset in floating point (in seconds) since
+		// begining of recording
+		onset = (evt_stk->events[e].pos + diff_idx) * fs;
+		if (xdf_add_event(xdf, evttype, onset, 0.0f)) {
+			mm_raise_from_errno("xdf_add_event(..., %d, ...) failed", evttype);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 // EEG acquisition thread
 static
 void* reading_thread(void* arg)
@@ -190,36 +295,47 @@ void* reading_thread(void* arg)
 	float *eeg, *exg;
 	int32_t *tri;
 	mcpanel* panel = arg;
-	unsigned int neeg, nexg;
+	unsigned int neeg, nexg, ntri;
 	int run_acq, error, saving = 0;
-	ssize_t nsread;
+	int nsread, total_rec, total_read, rec_start;
 	float fs;
-	unsigned int counter = 0;
-	char text_label[32];
-	int result;
-	struct mcp_widget* mcp_widget_s;
+	struct rectimer_data rectimer;
+	struct event_tracker* trk = &evttrk;
+	struct event_stack* evt_stk;
+
+	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
+	rectimer_data_init(&rectimer, panel, fs);
 
 	neeg = grp[0].nch;
 	nexg = grp[1].nch;
+	ntri = grp[2].nch;
 
 	eeg = neeg ? calloc(neeg*NSAMPLES, sizeof(*eeg)) : NULL;
 	exg = nexg ? calloc(nexg*NSAMPLES, sizeof(*exg)) : NULL;
-	tri = calloc(NSAMPLES, sizeof(*tri));
-	
+	tri = ntri ? calloc(ntri*NSAMPLES, sizeof(*tri)) : NULL;
+
 	egd_start(dev);
-	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
+	total_read = 0;
+	total_rec = 0;
+	rec_start = 0;
+
 	while (1) {
-		
+
 		// update control flags
 		pthread_mutex_lock(&sync_mtx);
 		run_acq = run_eeg;
 		if (saving != record_file) {
 			// report write status back
-			if (record_file)
+			if (record_file != REC_PAUSE)
 				pthread_mutex_lock(&file_mtx);
 			else
 				pthread_mutex_unlock(&file_mtx);
 			saving = record_file;
+
+			if (saving == REC_RESET_AND_SAVING) {
+				total_rec = 0;
+				rec_start = total_read;
+			}
 		}
 		pthread_mutex_unlock(&sync_mtx);
 
@@ -235,10 +351,12 @@ void* reading_thread(void* arg)
 			mcp_popup_message(panel, get_acq_msg(error));
 			break;
 		}
+		total_read += nsread;
+		event_tracker_update_ns_read(trk, total_read);
+		evt_stk = event_tracker_swap_eventstack(trk);
 
-		
 		// Write samples on file
-		if (saving) {
+		if (saving != REC_PAUSE) {
 			if (xdf_write(xdf, nsread, eeg, exg, tri) < 0) {
 				pthread_attr_t attr;
 				pthread_t thid;
@@ -255,14 +373,15 @@ void* reading_thread(void* arg)
 				pthread_create(&thid, &attr, display_bdf_error, panel);
 				pthread_attr_destroy(&attr);
 			}
+			record_event(evt_stk, fs, rec_start);
+
+			total_rec += nsread;
 
 			// display how long we are recording
-			counter++;
-			sprintf(text_label, "%d seconds", (int)((counter*NSAMPLES)/fs));
-			mcp_widget_s = mcp_get_widget(panel, "file_length_label");
-			result = mcp_widget_set_label(mcp_widget_s, text_label);
+			rectimer_data_update(&rectimer, total_rec);
 		}
 
+		mcp_add_events(panel, 0, evt_stk->nevent, evt_stk->events);
 		mcp_add_samples(panel, 0, nsread, eeg);
 		mcp_add_samples(panel, 1, nsread, eeg);
 		mcp_add_samples(panel, 2, nsread, exg);
@@ -282,13 +401,15 @@ void* reading_thread(void* arg)
 	return 0;
 }
 
-// Connection to the system 
+
+// Connection to the system
 static
 int Connect(mcpanel* panel)
 {
 	int retval;
 	const char*** clabels;
 	float fs;
+	unsigned int ntri;
 
 	retval = device_connection();
 	if (retval)
@@ -297,17 +418,23 @@ int Connect(mcpanel* panel)
 	fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 	clabels = (const char***)labels;
 
+	// Retrieve the number of trigger channels
+	ntri = grp[2].nch;
+
 	// Setup the panel with the settings
 	mcp_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
 	mcp_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
 	mcp_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
-	mcp_define_triggers(panel, 16, fs);
+	mcp_define_trigg_input(panel, 16, ntri, fs, clabels[2]);
 
 	pthread_mutex_lock(&sync_mtx);
 	run_eeg = 1;
 	pthread_mutex_unlock(&sync_mtx);
 	pthread_create(&thread_id, NULL, reading_thread, panel);
-	
+
+	// Network event connection and reception
+	event_tracker_init(&evttrk, fs);
+
 	return 0;
 }
 
@@ -317,12 +444,17 @@ int Disconnect(mcpanel* panel)
 {
 	(void)panel;
 
+	StopRecording(NULL);
+
 	pthread_mutex_lock(&sync_mtx);
 	run_eeg = 0;
 	pthread_mutex_unlock(&sync_mtx);
 
 	pthread_join(thread_id, NULL);
 	device_disconnection();
+
+	event_tracker_deinit(&evttrk);
+
 	return 0;
 }
 
@@ -427,22 +559,48 @@ int setup_xdf_channel_group(int igrp)
 }
 
 static
+void create_file(mcpanel* panel)
+{
+	const char *fileext, *dot;
+	char *filename;
+
+	xdf = NULL;
+
+	filename = mcp_open_filename_dialog(panel,
+	                              "GDF files|*.gdf|*.GDF||BDF files|*.bdf|*.BDF||Any files|*");
+
+	// Check that user hasn't pressed cancel
+	if (filename == NULL)
+		return ;
+
+	// Create the BDF/GDF file
+	dot = strrchr(filename, '.');
+	if (!dot || dot == filename) {
+		fprintf(stderr, "No file extension has been provided! Defaulting to GDF\n");
+		fileext = "gdf";
+	} else {
+		fileext = dot + 1;
+	}
+
+	if (mmstrcasecmp(fileext, "bdf")==0) {
+		xdf = xdf_open(filename, XDF_WRITE, XDF_BDF);
+	} else if (mmstrcasecmp(fileext, "gdf")==0) {
+		xdf = xdf_open(filename, XDF_WRITE, XDF_GDF2);
+	} else {
+		fprintf(stderr, "File extension should be either BDF or GDF! Defaulting to GDF\n");
+		xdf = xdf_open(filename, XDF_WRITE, XDF_GDF2);
+	}
+}
+
+static
 int SetupRecording(void *user_data)
 {
 	mcpanel *panel = user_data;
-	char *filename;
 	unsigned int j;
+	int fileformat = -1;
 	int fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 
-	filename = mcp_open_filename_dialog(panel,
-	                              "BDF files|*.bdf|*.BDF||Any files|*");
-	
-	// Check that user hasn't press cancel
-	if (filename == NULL)
-		return 0;
-
-	// Create the BDF file
-	xdf = xdf_open(filename, XDF_WRITE, XDF_BDF);
+	create_file(panel);
 	if (!xdf) 
 		goto abort;
 
@@ -462,6 +620,9 @@ int SetupRecording(void *user_data)
 	if (xdf_prepare_transfer(xdf))
 		goto abort;
 
+	//Store file type for later use
+	xdf_get_conf(xdf, XDF_F_FILEFMT, &fileformat, XDF_NOF);
+	skip_event_recording = (fileformat != XDF_GDF2);
 	return 1;
 	
 abort:
@@ -493,9 +654,20 @@ static
 int ToggleRecording(int start, void* user_data)
 {
 	(void)user_data;
+
 	pthread_mutex_lock(&sync_mtx);
-	record_file = start;
+
+	record_file = start ? REC_PAUSE : REC_SAVING;
+
+	// If it is the first toggle_recording after recording setup, we
+	// must reset the counters.
+	if (reset_record_counter && start) {
+		record_file = REC_RESET_AND_SAVING;
+		reset_record_counter = 0;
+	}
+
 	pthread_mutex_unlock(&sync_mtx);
+
 	return 1;
 }
 

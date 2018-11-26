@@ -35,6 +35,7 @@ AC_SEARCH_LIBS([pthread_create], [pthread posix4], [], AC_MSG_ERROR([The pthread
 AC_SEARCH_LIBS([mcp_create], [mcpanel], [], AC_MSG_ERROR([The mcpanel library must be installed.]))
 AC_SEARCH_LIBS([xdf_open], [xdffileio], [], AC_MSG_ERROR([The xdffileio library must be installed.]))
 AC_SEARCH_LIBS([egd_start], [eegdev], [], AC_MSG_ERROR([The eegdev library must be installed.]))
+AC_SEARCH_LIBS([mm_socket], [mmlib], [], AC_MSG_ERROR([The mmlib library must be installed.]))
 AC_SUBST(AM_LDFLAGS)
 
 AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile
