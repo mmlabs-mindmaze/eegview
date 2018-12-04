@@ -93,7 +93,7 @@ error:
 static
 int event_tracker_accept_client(struct event_tracker* trk)
 {
-	struct sockaddr_in* client_address;
+	struct sockaddr_in client_address;
 	struct sockaddr* addr;
 	socklen_t addr_len;
 	char ip4[16];
