@@ -51,6 +51,9 @@ int create_listening_socket(int port)
 	if (sock < 0)
 		return -1;
 
+	if (mm_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
+		goto error;
+
 	// Construct local address struct
 	snprintf(service, sizeof(service), "%i", port);
 	if (mm_getaddrinfo(NULL, service, &hints, &res))
@@ -65,7 +68,6 @@ int create_listening_socket(int port)
 
 	// Listen for incoming clients (if sock has been bound)
 	if (  rp == NULL
-	   || mm_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse))
 	   || mm_listen(sock, 1))
 		goto error;
 
