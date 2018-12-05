@@ -101,9 +101,10 @@ static char **labels[3] = {NULL, NULL, NULL};
 static const char* scale_labels[NSCALE] = {"25.0mV", "50.0mV"};
 static const float scale_values[NSCALE] = {25.0e3, 50.0e3};
 
-#define NTAB 3
+#define NTAB 4
 static struct panel_tabconf tabconf[NTAB] = {
 	{.type = TABTYPE_SCOPE, .name = "EEG"},
+	{.type = TABTYPE_SPECTRUM, .name = "EEG spectrum"},
 	{.type = TABTYPE_BARGRAPH, .name = "Offsets", .nscales = NSCALE,
 	 .sclabels = scale_labels, .scales = scale_values},
 	{.type = TABTYPE_SCOPE, .name = "Sensors"}
@@ -384,7 +385,8 @@ void* reading_thread(void* arg)
 		mcp_add_events(panel, 0, evt_stk->nevent, evt_stk->events);
 		mcp_add_samples(panel, 0, nsread, eeg);
 		mcp_add_samples(panel, 1, nsread, eeg);
-		mcp_add_samples(panel, 2, nsread, exg);
+		mcp_add_samples(panel, 2, nsread, eeg);
+		mcp_add_samples(panel, 3, nsread, exg);
 		mcp_add_triggers(panel, nsread, (const uint32_t*)tri);
 
 	}
@@ -424,7 +426,8 @@ int Connect(mcpanel* panel)
 	// Setup the panel with the settings
 	mcp_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
 	mcp_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
-	mcp_define_tab_input(panel, 2, grp[1].nch, fs, clabels[1]);
+	mcp_define_tab_input(panel, 2, grp[0].nch, fs, clabels[0]);
+	mcp_define_tab_input(panel, 3, grp[1].nch, fs, clabels[1]);
 	mcp_define_trigg_input(panel, 16, ntri, fs, clabels[2]);
 
 	pthread_mutex_lock(&sync_mtx);
