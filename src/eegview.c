@@ -657,7 +657,7 @@ int ToggleRecording(int start, void* user_data)
 
 	pthread_mutex_lock(&sync_mtx);
 
-	record_file = start ? REC_PAUSE : REC_SAVING;
+	record_file = start ? REC_SAVING : REC_PAUSE;
 
 	// If it is the first toggle_recording after recording setup, we
 	// must reset the counters.
