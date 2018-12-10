@@ -194,7 +194,7 @@ int event_tracker_add_event(struct event_tracker* trk, uint32_t evttype)
 	// Compute number of sample passed being acquired given ts relative to
 	// last update
 	dt = mm_timediff_ns(&ts, &trk->last_read_ts);
-	pos = dt * 1e-9f / trk->fs;
+	pos = dt * 1e-9f * trk->fs;
 	pos += trk->last_total_read;
 
 	// Get event struct for storing (from event stack used for writing)

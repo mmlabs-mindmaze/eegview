@@ -280,7 +280,7 @@ int record_event(struct event_stack* evt_stk, float fs, int diff_idx)
 
 		// Compute onset in floating point (in seconds) since
 		// begining of recording
-		onset = (evt_stk->events[e].pos + diff_idx) * fs;
+		onset = (evt_stk->events[e].pos - diff_idx) / fs;
 		if (xdf_add_event(xdf, evttype, onset, 0.0f)) {
 			mm_raise_from_errno("xdf_add_event(..., %d, ...) failed", evttype);
 			return -1;
@@ -626,6 +626,7 @@ int SetupRecording(void *user_data)
 	//Store file type for later use
 	xdf_get_conf(xdf, XDF_F_FILEFMT, &fileformat, XDF_NOF);
 	skip_event_recording = (fileformat != XDF_GDF2);
+	reset_record_counter = 1;
 	return 1;
 	
 abort:
