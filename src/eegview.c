@@ -562,7 +562,7 @@ int setup_xdf_channel_group(int igrp)
 }
 
 static
-void create_file(mcpanel* panel)
+int create_file(mcpanel* panel)
 {
 	const char *fileext, *dot;
 	char *filename;
@@ -574,7 +574,7 @@ void create_file(mcpanel* panel)
 
 	// Check that user hasn't pressed cancel
 	if (filename == NULL)
-		return ;
+		return 0;
 
 	// Create the BDF/GDF file
 	dot = strrchr(filename, '.');
@@ -593,6 +593,8 @@ void create_file(mcpanel* panel)
 		fprintf(stderr, "File extension should be either BDF or GDF! Defaulting to GDF\n");
 		xdf = xdf_open(filename, XDF_WRITE, XDF_GDF2);
 	}
+
+	return 1;
 }
 
 static
@@ -603,8 +605,10 @@ int SetupRecording(void *user_data)
 	int fileformat = -1;
 	int fs = egd_get_cap(dev, EGD_CAP_FS, NULL);
 
-	create_file(panel);
-	if (!xdf) 
+	if (!create_file(panel))
+		return 0;
+
+	if (!xdf)
 		goto abort;
 
 	// Configuration file genral header
