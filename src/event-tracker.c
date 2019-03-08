@@ -43,7 +43,8 @@ int create_listening_socket(int port)
 	int reuse = -1;
 	struct addrinfo hints = {
 		.ai_family = AF_INET,
-		.ai_socktype = SOCK_STREAM
+		.ai_socktype = SOCK_STREAM,
+		.ai_flags = AI_PASSIVE,
 	};
 
 	// Create server socket
