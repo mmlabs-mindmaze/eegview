@@ -57,7 +57,7 @@ struct event_tracker {
 	struct event_stack stacks[2];
 };
 
-int event_tracker_init(struct event_tracker* trk, float fs);
+int event_tracker_init(struct event_tracker* trk, float fs, int port);
 void event_tracker_deinit(struct event_tracker* trk);
 struct event_stack* event_tracker_swap_eventstack(struct event_tracker* trk);
 void event_tracker_update_ns_read(struct event_tracker* trk, int total_read);

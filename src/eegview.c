@@ -38,7 +38,6 @@
 
 #include "event-tracker.h"
 
-
 enum {
 	REC_PAUSE = 0,
 	REC_SAVING,
@@ -60,6 +59,7 @@ struct rectimer_data {
 static const char* uifilename = NULL;
 static const char* devstring = NULL;
 static const char* version = NULL;
+static int eventport = 1234;
 
 static char eegview_doc[] =
 	"eegview is a gui program to display and record eeg data.";
@@ -76,6 +76,8 @@ static const struct mmarg_opt cmdline_optv[] = {
 	 "Set eegview device"},
 	{"version", MMOPT_NOVAL, "set", {.sptr = &version},
 	 "Display eegview version"},
+	{"p|event-port", MMOPT_OPTINT, NULL, {.iptr = &eventport},
+	 "Set eegdev event port number"},
 };
 
 
@@ -458,7 +460,7 @@ int Connect(mcpanel* panel)
 	pthread_create(&thread_id, NULL, reading_thread, panel);
 
 	// Network event connection and reception
-	event_tracker_init(&evttrk, fs);
+	event_tracker_init(&evttrk, fs, eventport);
 
 	return 0;
 }

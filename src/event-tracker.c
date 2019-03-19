@@ -29,7 +29,6 @@
 #include "mmpredefs.h"
 #include "mmtime.h"
 
-#define EVENTPORT	1234
 #define ACCEPT_TIMEOUT  500 //in ms
 
 
@@ -314,7 +313,7 @@ void event_tracker_update_ns_read(struct event_tracker* trk, int total_read)
 }
 
 
-int event_tracker_init(struct event_tracker* trk, float fs)
+int event_tracker_init(struct event_tracker* trk, float fs, int port)
 {
 	*trk = (struct event_tracker) {
 		.client_socket = -1,
@@ -323,7 +322,7 @@ int event_tracker_init(struct event_tracker* trk, float fs)
 	};
 
 	pthread_mutex_init(&trk->mtx, NULL);
-	trk->server_socket = create_listening_socket(EVENTPORT);
+	trk->server_socket = create_listening_socket(port);
 	if (trk->server_socket == -1) {
 		trk->quit_loop = 1;
 		return -1;
