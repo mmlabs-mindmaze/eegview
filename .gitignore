@@ -1,0 +1,53 @@
+# external tool files
+*.swp
+*.swo
+tags
+/cscope.*
+*.unc-backup~
+*.unc-backup.md5~
+*.uncrustify
+*.gcno
+
+# autotools generated files
+aclocal.m4
+Makefile.in
+configure
+config.log
+config.status
+configure.scan
+install-sh
+missing
+stamp-h1
+libtool
+compile
+Makefile
+Makefile.in
+.deps
+INSTALL
+ABOUT-NLS
+.dirstamp
+*.tar.xz
+
+autom4te.cache/*
+build-aux/*
+.libs/
+
+# unit-test generated files
+*.log
+*.trs
+
+# ignore build-directory if any
+/build*
+
+# C generated objects
+*.o
+*.la
+*.lo
+
+# generated files
+eegview
+eegview.desktop
+
+
+# nfs tmp files
+*.nfs*
