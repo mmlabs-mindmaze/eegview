@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <mcpanel.h>
+#include <mmargparse.h>
 #include <mmerrno.h>
 #include <mmlib.h>
 #include <pthread.h>
@@ -58,6 +59,25 @@ struct rectimer_data {
  **************************************************************************/
 static const char* uifilename = NULL;
 static const char* devstring = NULL;
+static const char* version = NULL;
+
+static char eegview_doc[] =
+	"eegview is a gui program to display and record eeg data.";
+
+static char eegview_synopsys[] =
+	"[GTK+ options...] [--device=<devstring>] [--ui-file=<file>]\n"
+	"[--help]\n"
+	"[--version]";
+
+static const struct mmarg_opt cmdline_optv[] = {
+	{"ui-file", MMOPT_OPTSTR, NULL, {.sptr = &uifilename},
+	 "Set eegview ui-file"},
+	{"device", MMOPT_OPTSTR, NULL, {.sptr = &devstring},
+	 "Set eegview device"},
+	{"version", MMOPT_NOVAL, "set", {.sptr = &version},
+	 "Display eegview version"},
+};
+
 
 pthread_t thread_id;
 pthread_mutex_t sync_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -688,32 +708,6 @@ int ToggleRecording(int start, void* user_data)
  *              Initialization of the application                         *
  *                                                                        * 
  **************************************************************************/
-enum option_index {
-	UIFILE,
-	DEVSTRING,
-	SOFTWAREVERSION,
-	HELP,
-	NUM_OPTS
-};
-
-static struct option opt_str[] = {
-	[UIFILE] = {"ui-file", 1, NULL, 0},
-	[DEVSTRING] = {"device", 1, NULL, 0},
-	[SOFTWAREVERSION] = {"version", 0, NULL, 0},
-	[HELP] = {"help", 0, NULL, 'h'}
-
-};
-
-
-static void print_usage(const char* cmd)
-{
-	fprintf(stdout,
-"Usage: %s [GTK+ OPTIONS...]\n"
-"            [--device=DEVSTRING] [--ui-file=FILE]\n"
-"            [--version] [--help | -h]\n",
-               cmd);
-	
-}
 
 static void print_version(void)
 {
@@ -722,40 +716,6 @@ static void print_version(void)
 	       PACKAGE_VERSION,
 	       egd_get_string(),
 	       xdf_get_string());
-}
-
-static 
-int process_options(int argc, char* argv[])
-{
-	int c;
-	int option_index = 0;
-
-	while (1) {
-		c = getopt_long(argc, argv, "h", opt_str, &option_index);
-		if (c == -1)
-			break;
-
-		switch (c) {
-		case 0:
-			if (option_index == UIFILE)
-				uifilename = optarg;
-			else if (option_index == DEVSTRING)
-				devstring = optarg;
-			else if (option_index == SOFTWAREVERSION)
-				print_version();
-			break;
-
-		case 'h':
-			print_usage(argv[0]);
-			return 1;
-
-		case '?':
-			print_usage(argv[0]);
-			return -1;
-		}
-	}
-
-	return 0;
 }
 
 
@@ -778,14 +738,32 @@ int main(int argc, char* argv[])
 		.custom_button = &custom_button,
 		.confname = PACKAGE_NAME
 	};
+	struct mmarg_parser parser = {
+		.doc = eegview_doc,
+		.args_doc = eegview_synopsys,
+		.optv = cmdline_optv,
+		.num_opt = MM_NELEM(cmdline_optv),
+		.execname = "eegview",
+	};
 
-	// Process command line options
+
+
+	/* Process command line options */
+
+	/* 1st process GTK+ options */
 	mcp_init_lib(&argc, &argv);
-	retval = process_options(argc, argv);
-	if (retval)
-		return (retval > 0) ? 0 : -retval;
-	
+	/* read eegview command line options */
+	retval = mmarg_parse(&parser, argc, (char**)argv);
+	if (retval < 0)
+		return retval;
 
+	/* handle non-command options */
+	if (version) {
+		print_version();
+		goto exit;
+	}
+
+	/* open GUI and run eegview */
 	panel = mcp_create(uifilename, &cb, NTAB, tabconf);
 	if (!panel) {
 		fprintf(stderr,"error at the creation of the panel\n");
