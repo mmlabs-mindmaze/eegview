@@ -280,7 +280,7 @@ int device_disconnection(void)
 /**
  * record_event() - add events to xdffile
  * @evt_stk:    stack of event to store in file
- * @fs:         sampling freqency of acquisition
+ * @fs:         sampling frequency of acquisition
  * @diff_idx:   index of acquired sample when recording started
  */
 static
@@ -301,7 +301,7 @@ int record_event(struct event_stack* evt_stk, float fs, int diff_idx)
 		}
 
 		// Compute onset in floating point (in seconds) since
-		// begining of recording
+		// beginning of recording
 		onset = (evt_stk->events[e].pos - diff_idx) / fs;
 		if (xdf_add_event(xdf, evttype, onset, 0.0f)) {
 			mm_raise_from_errno("xdf_add_event(..., %d, ...) failed", evttype);
