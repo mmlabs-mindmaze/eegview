@@ -72,7 +72,7 @@ static char eegview_synopsys[] =
 static const struct mmarg_opt cmdline_optv[] = {
 	{"ui-file", MMOPT_OPTSTR, NULL, {.sptr = &uifilename},
 	 "Set eegview ui-file"},
-	{"device", MMOPT_OPTSTR, NULL, {.sptr = &devstring},
+	{"d|device", MMOPT_OPTSTR, NULL, {.sptr = &devstring},
 	 "Set eegview device"},
 	{"version", MMOPT_NOVAL, "set", {.sptr = &version},
 	 "Display eegview version"},
