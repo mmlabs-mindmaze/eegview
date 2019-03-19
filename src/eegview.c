@@ -74,7 +74,7 @@ static const struct mmarg_opt cmdline_optv[] = {
 	 "Set eegview ui-file"},
 	{"d|device", MMOPT_OPTSTR, NULL, {.sptr = &devstring},
 	 "Set eegview device"},
-	{"version", MMOPT_NOVAL, "set", {.sptr = &version},
+	{"v|version", MMOPT_NOVAL, "set", {.sptr = &version},
 	 "Display eegview version"},
 	{"p|event-port", MMOPT_OPTINT, NULL, {.iptr = &eventport},
 	 "Set eegdev event port number"},
