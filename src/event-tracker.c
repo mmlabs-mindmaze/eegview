@@ -20,10 +20,14 @@
 
 #include <mmlog.h>
 #include <mmsysio.h>
-#include <stdio.h>
 #include <pthread.h>
+#include <stdint.h>
+#include <stdio.h>
 
 #include "event-tracker.h"
+#include "mcpanel.h"
+#include "mmpredefs.h"
+#include "mmtime.h"
 
 #define EVENTPORT	1234
 #define ACCEPT_TIMEOUT  500 //in ms

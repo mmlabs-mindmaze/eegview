@@ -18,8 +18,8 @@
 #define EVENT_TRACKER_H
 
 #include <mcpanel.h>
-#include <mmtime.h>
-#include <stdint.h>
+#include <pthread.h>
+#include <time.h>
 
 #define NEVENT_MAX      16
 

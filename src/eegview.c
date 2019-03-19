@@ -21,17 +21,19 @@
 # include <config.h>
 #endif
 
-#include <stdio.h>
-#include <mcpanel.h>
 #include <eegdev.h>
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
-#include <xdfio.h>
 #include <errno.h>
 #include <getopt.h>
-#include <mmlib.h>
+#include <mcpanel.h>
 #include <mmerrno.h>
+#include <mmlib.h>
+#include <pthread.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <xdfio.h>
 
 #include "event-tracker.h"
 
