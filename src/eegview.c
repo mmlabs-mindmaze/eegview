@@ -140,6 +140,7 @@ static int StopRecording(void* user_data);
  *              Error message helper functions                            *
  *                                                                        * 
  **************************************************************************/
+static
 const char* get_acq_msg(int error)
 {
 	return strerror(error);
