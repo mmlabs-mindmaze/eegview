@@ -38,7 +38,6 @@ AC_SEARCH_LIBS([egd_start], [eegdev], [], AC_MSG_ERROR([The eegdev library must 
 AC_SEARCH_LIBS([mm_socket], [mmlib], [], AC_MSG_ERROR([The mmlib library must be installed.]))
 AC_SUBST(AM_LDFLAGS)
 
-AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile
-                 data/Makefile data/eegview.desktop])
+AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile data/Makefile])
 AC_OUTPUT
 
