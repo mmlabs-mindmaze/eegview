@@ -552,37 +552,42 @@ int setup_xdf_channel_group(int igrp)
 	char label[32], transducter[128], unit[16], filtering[128];
 	double mm[2];
 	unsigned int j;
+	int rv;
 	int isint;
-	struct xdfch* ch;
-
-	egd_channel_info(dev, grp[igrp].sensortype, 0,
-			 EGD_UNIT, unit,
-			 EGD_TRANSDUCTER, transducter,
-			 EGD_PREFILTERING, filtering,
-			 EGD_MM_D, mm,
-			 EGD_ISINT, &isint,
-			 EGD_EOL);
-
-	xdf_set_conf(xdf, 
-	               XDF_CF_ARRINDEX, igrp,
-		       XDF_CF_ARROFFSET, 0,
-		       XDF_CF_ARRDIGITAL, 0,
-		       XDF_CF_ARRTYPE, isint ? XDFINT32 : XDFFLOAT,
-		       XDF_CF_PMIN, mm[0],
-		       XDF_CF_PMAX, mm[1],
-		       XDF_CF_TRANSDUCTER, transducter,
-	               XDF_CF_PREFILTERING, filtering,
-		       XDF_CF_UNIT, unit,
-		       XDF_NOF);
+	struct xdfch * ch;
 
 	for (j = 0; j < grp[igrp].nch; j++) {
-		egd_channel_info(dev, grp[igrp].sensortype, j,
-		                 EGD_LABEL, label, EGD_EOL);
+		rv = egd_channel_info(dev,
+		                      grp[igrp].sensortype, j,
+		                      EGD_ISINT, &isint,
+		                      EGD_LABEL, label,
+		                      EGD_MM_D, mm,
+		                      EGD_PREFILTERING, filtering,
+		                      EGD_TRANSDUCTER, transducter,
+		                      EGD_UNIT, unit,
+		                      EGD_EOL);
+		if (rv != 0)
+			return -1;
 
-		// Add the channel to the BDF
+		/* Add the channel to the BDF */
 		if ((ch = xdf_add_channel(xdf, label)) == NULL)
 			return -1;
+
+		rv = xdf_set_chconf(ch,
+		                    XDF_CF_ARRDIGITAL, 0,
+		                    XDF_CF_ARRINDEX, igrp,
+		                    XDF_CF_ARROFFSET, j * (isint ? sizeof(int32_t) : sizeof(float)),
+		                    XDF_CF_ARRTYPE, isint ? XDFINT32 : XDFFLOAT,
+		                    XDF_CF_PMAX, mm[1],
+		                    XDF_CF_PMIN, mm[0],
+		                    XDF_CF_PREFILTERING, filtering,
+		                    XDF_CF_TRANSDUCTER, transducter,
+		                    XDF_CF_UNIT, unit,
+		                    XDF_NOF);
+		if (rv != 0)
+			return -1;
 	}
+
 	return 0;
 }
 
