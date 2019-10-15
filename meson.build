@@ -3,7 +3,7 @@ project('eegview', 'c',
         default_options : [
             'warning_level=3',
         ],
-        meson_version: '>= 0.47'
+        meson_version: '>= 0.49'
 )
 
 cc = meson.get_compiler('c')
