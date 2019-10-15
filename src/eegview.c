@@ -554,6 +554,7 @@ int setup_xdf_channel_group(int igrp)
 	unsigned int j;
 	int rv;
 	int isint;
+	int dtype;
 	struct xdfch * ch;
 
 	for (j = 0; j < grp[igrp].nch; j++) {
@@ -573,11 +574,13 @@ int setup_xdf_channel_group(int igrp)
 		if ((ch = xdf_add_channel(xdf, label)) == NULL)
 			return -1;
 
+		dtype = isint ? XDFINT32 : XDFFLOAT;
 		rv = xdf_set_chconf(ch,
 		                    XDF_CF_ARRDIGITAL, 0,
 		                    XDF_CF_ARRINDEX, igrp,
 		                    XDF_CF_ARROFFSET, j * (isint ? sizeof(int32_t) : sizeof(float)),
-		                    XDF_CF_ARRTYPE, isint ? XDFINT32 : XDFFLOAT,
+		                    XDF_CF_STOTYPE, xdf_closest_type(xdf, dtype),
+		                    XDF_CF_ARRTYPE, dtype,
 		                    XDF_CF_PMAX, mm[1],
 		                    XDF_CF_PMIN, mm[0],
 		                    XDF_CF_PREFILTERING, filtering,
