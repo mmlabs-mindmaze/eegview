@@ -7,6 +7,7 @@ general:
       eegview is a small program to display/record EEG signals. It is
       particularly useful for setting up quickly the acquisition part of a
       offline protocol.
+    build-system: meson
     build-depends:
         - eegdev-devel
         - mcpanel-devel
