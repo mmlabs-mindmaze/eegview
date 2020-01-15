@@ -3,6 +3,10 @@ general:
     version: 0.1
     maintainer: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
     url: ssh://intranet.mindmaze.ch:29418/eegview
+    licenses: [ GPL-3 ]
+    Copyright: |
+      Copyright (C) 2008-2012 Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+      Copyright (C) 2012-2020 MindMaze Holdings SA
     description: |
       eegview is a small program to display/record EEG signals. It is
       particularly useful for setting up quickly the acquisition part of a
