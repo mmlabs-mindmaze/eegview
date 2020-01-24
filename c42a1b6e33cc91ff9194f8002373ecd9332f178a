@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "56f6905e_9d55fe2f",
+        "filename": "mmpack/specs",
+        "patchSetId": 2
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1017136
+      },
+      "writtenOn": "2020-01-24T07:53:30Z",
+      "side": 1,
+      "message": "with this very commit, you have a change in 2020.",
+      "range": {
+        "startLine": 9,
+        "startChar": 25,
+        "endLine": 9,
+        "endChar": 29
+      },
+      "revId": "c42a1b6e33cc91ff9194f8002373ecd9332f178a",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
