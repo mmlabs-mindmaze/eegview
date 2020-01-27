@@ -1,4 +1,4 @@
-AC_INIT(eegview,[0.1],[nicolas.bourdaud@gmail.com])
+AC_INIT(eegview,[1.0],[nicolas.bourdaud@gmail.com])
 AC_CONFIG_SRCDIR([src/eegview.c])
 #AC_CONFIG_LIBOBJ_DIR([lib])
 AC_CONFIG_MACRO_DIR([m4])
