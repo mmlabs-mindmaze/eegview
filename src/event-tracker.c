@@ -51,7 +51,7 @@ int create_listening_socket(int port)
 	};
 
 	// Create server socket
-	sock = mm_socket(AF_INET, SOCK_STREAM);
+	sock = mm_socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0)
 		return -1;
 
@@ -130,7 +130,7 @@ int event_tracker_accept_client(struct event_tracker* trk)
 		return -1;
 
 	mm_getnameinfo(addr, addr_len, ip4, sizeof(ip4), NULL, 0, NI_NUMERICHOST);
-	mmlog_info("Accepted client %s!", ip4);
+	mm_log_info("Accepted client %s!", ip4);
 
 	// Keep client socket if we are not exiting the event thread
 	pthread_mutex_lock(&trk->mtx);
@@ -164,7 +164,7 @@ int event_tracker_finish_client(struct event_tracker* trk)
 
 	pthread_mutex_unlock(&trk->mtx);
 
-	mmlog_info("Client disconnected");
+	mm_log_info("Client disconnected");
 
 	return quit;
 }
@@ -189,7 +189,7 @@ int event_tracker_add_event(struct event_tracker* trk, uint32_t evttype)
 	struct mcp_event* evt;
 	int64_t dt;
 	int quit, pos;
-	struct timespec ts;
+	struct mm_timespec ts;
 
 	mm_gettime(CLOCK_REALTIME, &ts);
 
@@ -302,7 +302,7 @@ struct event_stack* event_tracker_swap_eventstack(struct event_tracker* trk)
  */
 void event_tracker_update_ns_read(struct event_tracker* trk, int total_read)
 {
-	struct timespec ts;
+	struct mm_timespec ts;
 
 	mm_gettime(CLOCK_REALTIME, &ts);
 

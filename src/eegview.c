@@ -69,14 +69,14 @@ static char eegview_synopsys[] =
 	"[--help]\n"
 	"[--version]";
 
-static const struct mmarg_opt cmdline_optv[] = {
-	{"ui-file", MMOPT_OPTSTR, NULL, {.sptr = &uifilename},
+static const struct mm_arg_opt cmdline_optv[] = {
+	{"ui-file", MM_OPT_OPTSTR, NULL, {.sptr = &uifilename},
 	 "Set eegview ui-file"},
-	{"d|device", MMOPT_OPTSTR, NULL, {.sptr = &devstring},
+	{"d|device", MM_OPT_OPTSTR, NULL, {.sptr = &devstring},
 	 "Set eegview device"},
-	{"v|version", MMOPT_NOVAL, "set", {.sptr = &version},
+	{"v|version", MM_OPT_NOVAL, "set", {.sptr = &version},
 	 "Display eegview version"},
-	{"p|event-port", MMOPT_OPTINT, NULL, {.iptr = &eventport},
+	{"p|event-port", MM_OPT_OPTINT, NULL, {.iptr = &eventport},
 	 "Set eegdev event port number"},
 };
 
@@ -618,9 +618,9 @@ int create_file(mcpanel* panel)
 		fileext = dot + 1;
 	}
 
-	if (mmstrcasecmp(fileext, "bdf")==0) {
+	if (mm_strcasecmp(fileext, "bdf")==0) {
 		xdf = xdf_open(filename, XDF_WRITE, XDF_BDF);
-	} else if (mmstrcasecmp(fileext, "gdf")==0) {
+	} else if (mm_strcasecmp(fileext, "gdf")==0) {
 		xdf = xdf_open(filename, XDF_WRITE, XDF_GDF2);
 	} else {
 		fprintf(stderr, "File extension should be either BDF or GDF! Defaulting to GDF\n");
@@ -749,7 +749,7 @@ int main(int argc, char* argv[])
 		.custom_button = &custom_button,
 		.confname = PACKAGE_NAME
 	};
-	struct mmarg_parser parser = {
+	struct mm_arg_parser parser = {
 		.doc = eegview_doc,
 		.args_doc = eegview_synopsys,
 		.optv = cmdline_optv,
@@ -764,7 +764,7 @@ int main(int argc, char* argv[])
 	/* 1st process GTK+ options */
 	mcp_init_lib(&argc, &argv);
 	/* read eegview command line options */
-	retval = mmarg_parse(&parser, argc, (char**)argv);
+	retval = mm_arg_parse(&parser, argc, (char**)argv);
 	if (retval < 0)
 		return retval;
 
