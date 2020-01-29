@@ -19,7 +19,7 @@
 
 #include <mcpanel.h>
 #include <pthread.h>
-#include <time.h>
+#include <mmtime.h>
 
 #define NEVENT_MAX      16
 
@@ -49,7 +49,7 @@ struct event_tracker {
 	pthread_mutex_t mtx;
 	int server_socket;
 	int client_socket;
-	struct timespec last_read_ts;
+	struct mm_timespec last_read_ts;
 	int last_total_read;
 	float fs;
 	int stack_idx;
