@@ -60,6 +60,8 @@ static const char* uifilename = NULL;
 static const char* devstring = NULL;
 static const char* version = NULL;
 static int eventport = 1234;
+static char const * disabled_labels_list = NULL;  /* single csv of channels */
+static char ** disabled_labels = NULL;  /* NULL-terminated array version */
 
 static char eegview_doc[] =
 	"eegview is a gui program to display and record eeg data.";
@@ -78,6 +80,8 @@ static const struct mm_arg_opt cmdline_optv[] = {
 	 "Display eegview version"},
 	{"p|event-port", MM_OPT_OPTINT, NULL, {.iptr = &eventport},
 	 "Set eegdev event port number"},
+	{"disable", MM_OPT_NEEDSTR, NULL, {.sptr = &disabled_labels_list},
+	 "csv list of channels to disable"},
 };
 
 
@@ -429,6 +433,41 @@ void* reading_thread(void* arg)
 }
 
 
+static int
+is_disabled_channel(char const * label)
+{
+	char ** c;
+
+	if (disabled_labels != NULL) {
+		for (c = disabled_labels ; *c != NULL ; c++) {
+			if (strcmp(label, *c) == 0)
+				return 1;
+		}
+	}
+
+	return 0;
+}
+
+
+static int setup_tab_input(mcpanel* panel, int tabid, int nch,
+                           float fs, char const ** clabels)
+{
+	int i;
+	int enabled_nch = 0;
+	int chann_index[nch];
+
+	if (mcp_define_tab_input(panel, tabid, nch, fs, clabels) != 0)
+		return -1;
+
+	for (i = 0 ; i < nch ; i++) {
+		if (!is_disabled_channel(clabels[i]))
+			chann_index[enabled_nch++] = i;
+	}
+
+	return mcp_select_tab_channels(panel, tabid, enabled_nch, chann_index);
+}
+
+
 // Connection to the system
 static
 int Connect(mcpanel* panel)
@@ -449,10 +488,10 @@ int Connect(mcpanel* panel)
 	ntri = grp[2].nch;
 
 	// Setup the panel with the settings
-	mcp_define_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
-	mcp_define_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
-	mcp_define_tab_input(panel, 2, grp[0].nch, fs, clabels[0]);
-	mcp_define_tab_input(panel, 3, grp[1].nch, fs, clabels[1]);
+	setup_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
+	setup_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
+	setup_tab_input(panel, 2, grp[0].nch, fs, clabels[0]);
+	setup_tab_input(panel, 3, grp[1].nch, fs, clabels[1]);
 	mcp_define_trigg_input(panel, 16, ntri, fs, clabels[2]);
 
 	pthread_mutex_lock(&sync_mtx);
@@ -730,6 +769,46 @@ static void print_version(void)
 }
 
 
+static char ** parse_disabled_channels(char const * list)
+{
+	int n, i;
+	char const * s = list;
+	char const * bak;
+
+	n = 0;
+	while ((s = strchr(s, ','))  != NULL) {
+		n++;
+		s++;
+	}
+	n++;
+	disabled_labels = malloc((n + 1) * sizeof(*disabled_labels));
+
+	bak = list;
+	for (i = 0 ; i < n ; i++) {
+		s = strchr(bak, ',');
+		disabled_labels[i] = strndup(bak, s - bak);
+
+		bak = s + 1;
+	}
+	disabled_labels[n] = NULL;
+
+	return disabled_labels;
+}
+
+static void free_disabled_channels(void)
+{
+	char ** c;
+
+	if (disabled_labels != NULL) {
+		for (c = disabled_labels ; *c != NULL ; c++) {
+			free(*c);
+		}
+		free(disabled_labels);
+		disabled_labels = NULL;
+	}
+}
+
+
 int main(int argc, char* argv[])
 {
 	mcpanel* panel = NULL;
@@ -768,6 +847,10 @@ int main(int argc, char* argv[])
 	if (retval < 0)
 		return retval;
 
+	/* transform disabled channels csv input into a table */
+	if (disabled_labels_list != NULL)
+		disabled_labels = parse_disabled_channels(disabled_labels_list);
+
 	/* handle non-command options */
 	if (version) {
 		print_version();
@@ -788,6 +871,7 @@ int main(int argc, char* argv[])
 		Disconnect(panel);
 
 	mcp_destroy(panel);
+	free_disabled_channels();
 	retcode = EXIT_SUCCESS;
 
 exit:
