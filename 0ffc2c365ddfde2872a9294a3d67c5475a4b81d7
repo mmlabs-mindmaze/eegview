@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "43204192_2784dc45",
+        "filename": "doc/eegview.1",
+        "patchSetId": 1
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 1017133
+      },
+      "writtenOn": "2020-02-19T16:20:46Z",
+      "side": 1,
+      "message": "I do understand but most users will not....",
+      "range": {
+        "startLine": 33,
+        "startChar": 0,
+        "endLine": 33,
+        "endChar": 3
+      },
+      "revId": "0ffc2c365ddfde2872a9294a3d67c5475a4b81d7",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8f63c56c_3cb977f0",
+        "filename": "src/eegview.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 444,
+      "author": {
+        "id": 1017133
+      },
+      "writtenOn": "2020-02-19T16:20:46Z",
+      "side": 1,
+      "message": "whitespace",
+      "range": {
+        "startLine": 444,
+        "startChar": 13,
+        "endLine": 444,
+        "endChar": 14
+      },
+      "revId": "0ffc2c365ddfde2872a9294a3d67c5475a4b81d7",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
