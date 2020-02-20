@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3e6bd383_725323ad",
+        "filename": "src/eegview.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 1017443
+      },
+      "writtenOn": "2020-02-20T10:13:23Z",
+      "side": 1,
+      "message": "I would have add \"of disabled_labels_list\".\nAnd perhaps I would have renamed the variable disabled_labels_list into disabled_labels_csv. The term list could be kind of confusing when we do not look at the type of the variable.",
+      "range": {
+        "startLine": 64,
+        "startChar": 72,
+        "endLine": 64,
+        "endChar": 73
+      },
+      "revId": "222b6a5ce8cd2a69a22fade89ea238f12b42e491",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a9648d78_b1665cfe",
+        "filename": "src/eegview.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 776,
+      "author": {
+        "id": 1017443
+      },
+      "writtenOn": "2020-02-20T10:13:23Z",
+      "side": 1,
+      "message": "Could you rename this variable?",
+      "range": {
+        "startLine": 776,
+        "startChar": 14,
+        "endLine": 776,
+        "endChar": 17
+      },
+      "revId": "222b6a5ce8cd2a69a22fade89ea238f12b42e491",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5061cc38_d5a9da2d",
+        "filename": "src/eegview.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 779,
+      "author": {
+        "id": 1017443
+      },
+      "writtenOn": "2020-02-20T10:13:23Z",
+      "side": 1,
+      "message": "Too many spaces.",
+      "range": {
+        "startLine": 779,
+        "startChar": 28,
+        "endLine": 779,
+        "endChar": 29
+      },
+      "revId": "222b6a5ce8cd2a69a22fade89ea238f12b42e491",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
