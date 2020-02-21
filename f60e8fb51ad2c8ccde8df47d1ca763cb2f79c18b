@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f79c895a_e85da8c1",
+        "filename": "src/eegview.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 1017133
+      },
+      "writtenOn": "2020-02-21T09:04:54Z",
+      "side": 1,
+      "message": "I think disable-channel or something more specific would be better...\n\nIf it is only about selection, the option name could be :\n--unselect-channels",
+      "range": {
+        "startLine": 83,
+        "startChar": 3,
+        "endLine": 83,
+        "endChar": 10
+      },
+      "revId": "f60e8fb51ad2c8ccde8df47d1ca763cb2f79c18b",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
