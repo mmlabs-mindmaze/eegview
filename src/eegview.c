@@ -28,6 +28,7 @@
 #include <mmargparse.h>
 #include <mmerrno.h>
 #include <mmlib.h>
+#include <mmlog.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -433,6 +434,26 @@ void* reading_thread(void* arg)
 }
 
 
+static void
+warn_unexisting_channel(char const ** clabels, int nch)
+{
+	char ** c1;
+	int i;
+
+	if (unselected_labels == NULL || clabels == NULL)
+		return;
+
+	for (c1 = unselected_labels ; *c1 != NULL ; c1++) {
+		for (i = 0 ; i < nch ; i++) {
+			if (strcmp(clabels[i], *c1) == 0)
+				break;
+		}
+
+		if (i == nch)
+			mm_log_warn("channel %s does not exist", *c1);
+	}
+}
+
 static int
 is_unselected_channel(char const * label)
 {
@@ -461,6 +482,8 @@ static int setup_tab_input(mcpanel* panel, int tabid, int nch,
 
 	if (nch == 0)
 		return 0;
+
+	warn_unexisting_channel(clabels, nch);
 
 	for (i = 0 ; i < nch ; i++) {
 		if (!is_unselected_channel(clabels[i]))
