@@ -794,6 +794,25 @@ static void print_version(void)
 	       xdf_get_string());
 }
 
+#if defined(_WIN32) || defined(_WIN64)
+/* strndup() is not provided by windows nor mingw64 */
+static
+char * strndup(char const * s, size_t maxlen)
+{
+	size_t len = strlen(s);
+	if (maxlen < len)
+		len = maxlen;
+
+	char * copy = (char *) malloc(len + 1);
+	if (copy == NULL)
+		return NULL;
+
+	memcpy(copy, s, len);
+	copy[len] = '\0';
+
+	return copy;
+}
+#endif /* defined(_WIN32) || defined(_WIN64) */
 
 static char ** parse_unselected_channels(char const * list)
 {
