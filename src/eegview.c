@@ -794,6 +794,18 @@ static void print_version(void)
 	       xdf_get_string());
 }
 
+static
+char * memdup(char const * s, size_t len)
+{
+	char * copy = (char *) malloc(len + 1);
+	if (copy == NULL)
+		return NULL;
+
+	memcpy(copy, s, len);
+	copy[len] = '\0';
+
+	return copy;
+}
 
 static char ** parse_unselected_channels(char const * list)
 {
@@ -812,7 +824,7 @@ static char ** parse_unselected_channels(char const * list)
 	prev = list;
 	for (i = 0 ; i < n ; i++) {
 		s = strchr(prev, ',');
-		unselected_labels[i] = strndup(prev, s - prev);
+		unselected_labels[i] = memdup(prev, s - prev);
 
 		prev = s + 1;
 	}
