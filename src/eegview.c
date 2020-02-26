@@ -823,7 +823,7 @@ static char ** parse_unselected_channels(char const * list)
 
 	prev = list;
 	for (i = 0 ; i < n ; i++) {
-		s = strchr(prev, ',');
+		s = strchrnul(prev, ',');
 		unselected_labels[i] = memdup(prev, s - prev);
 
 		prev = s + 1;

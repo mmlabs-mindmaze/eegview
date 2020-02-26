@@ -17,6 +17,7 @@ AC_SUBST(LIBTOOL_DEPS)
 AC_HEADER_STDC
 AC_C_CONST
 
+AC_DEFINE([_GNU_SOURCE], [1], [])
 
 os_support=other
 case $host in

@@ -18,6 +18,7 @@ config.set('PACKAGE_VERSION', '"' + meson.project_version() + '"')
 
 # write config file
 build_cfg = 'config.h'  # named as such to match autotools build system
+config.set('_GNU_SOURCE', '1')
 configure_file(output : build_cfg, configuration : config)
 
 # define HAVE_CONFIG_H with compiler command line to include the generated
