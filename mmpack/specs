@@ -17,3 +17,7 @@ general:
         - mcpanel-devel
         - mmlib-devel
         - xdffileio-devel
+
+eegview:
+    depends:
+     - eegdev-datafile-plugin: any
