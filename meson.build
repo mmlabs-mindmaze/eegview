@@ -1,5 +1,5 @@
 project('eegview', 'c',
-        version : '1.0',
+        version : '1.1',
         default_options : [
             'warning_level=3',
         ],

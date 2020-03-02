@@ -1,6 +1,6 @@
 general:
     name: eegview
-    version: 1.0
+    version: 1.1
     maintainer: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
     url: ssh://intranet.mindmaze.ch:29418/eegview
     licenses: [ GPL-3 ]
