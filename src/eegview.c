@@ -63,6 +63,7 @@ static const char* version = NULL;
 static int eventport = 1234;
 static char const * unselected_labels_csv = NULL;  /* single csv of channels */
 static char ** unselected_labels = NULL;  /* NULL-terminated array version */
+static int channel_not_found = 0;
 
 static char eegview_doc[] =
 	"eegview is a gui program to display and record eeg data.";
@@ -449,8 +450,8 @@ warn_unexisting_channel(char const ** clabels, int nch)
 				break;
 		}
 
-		if (i == nch)
-			mm_log_warn("channel %s does not exist", *c1);
+		if (i != nch)
+			channel_not_found &= 0;
 	}
 }
 
@@ -514,10 +515,14 @@ int Connect(mcpanel* panel)
 	ntri = grp[2].nch;
 
 	// Setup the panel with the settings
+	channel_not_found = 1;
 	setup_tab_input(panel, 0, grp[0].nch, fs, clabels[0]);
 	setup_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
 	setup_tab_input(panel, 2, grp[0].nch, fs, clabels[0]);
 	setup_tab_input(panel, 3, grp[1].nch, fs, clabels[1]);
+	if (channel_not_found)
+		mm_log_warn("unselected channel not found");
+
 	mcp_define_trigg_input(panel, 16, ntri, fs, clabels[2]);
 
 	pthread_mutex_lock(&sync_mtx);
