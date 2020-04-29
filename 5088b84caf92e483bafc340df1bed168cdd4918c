@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "897eadf7_56886fbe",
+        "filename": "src/eegview.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 523,
+      "author": {
+        "id": 1017133
+      },
+      "writtenOn": "2020-04-29T11:48:13Z",
+      "side": 1,
+      "message": "As far as I understand, if we don\u0027t unselect any channels, we will have the warning.\n\nI think (to be confirmed) that \"!unselected_labels\" must be tested as well to issue the warning",
+      "range": {
+        "startLine": 523,
+        "startChar": 5,
+        "endLine": 523,
+        "endChar": 22
+      },
+      "revId": "5088b84caf92e483bafc340df1bed168cdd4918c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
