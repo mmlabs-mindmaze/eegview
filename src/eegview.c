@@ -63,6 +63,9 @@ static const char* version = NULL;
 static int eventport = 1234;
 static char const * unselected_labels_csv = NULL;  /* single csv of channels */
 static char ** unselected_labels = NULL;  /* NULL-terminated array version */
+static int* unselected_found = NULL;  /* number of use of selected channels
+                                         same length as unselected_labels
+					 minus NULL terminator*/
 
 static char eegview_doc[] =
 	"eegview is a gui program to display and record eeg data.";
@@ -435,24 +438,42 @@ void* reading_thread(void* arg)
 
 
 static void
-warn_unexisting_channel(char const ** clabels, int nch)
+update_unselected_channel_use(char const ** clabels, int nch)
 {
-	char ** c1;
-	int i;
+	const char* ignored_label;
+	int i, j;
 
 	if (unselected_labels == NULL || clabels == NULL)
 		return;
 
-	for (c1 = unselected_labels ; *c1 != NULL ; c1++) {
-		for (i = 0 ; i < nch ; i++) {
-			if (strcmp(clabels[i], *c1) == 0)
+	for (i = 0; unselected_labels[i] != NULL; i++) {
+		ignored_label = unselected_labels[i];
+		for (j = 0 ; j < nch ; j++) {
+			if (strcmp(clabels[j], ignored_label) == 0) {
+				unselected_found[i]++;
 				break;
+			}
 		}
-
-		if (i == nch)
-			mm_log_warn("channel %s does not exist", *c1);
 	}
 }
+
+
+static
+void report_unknown_unselected_channels(void)
+{
+	int i;
+	const char* label;
+
+	if (!unselected_labels)
+		return;
+
+	for (i = 0; unselected_labels[i] != NULL; i++) {
+		label = unselected_labels[i];
+		if (!unselected_found[i])
+			mm_log_warn("unselected channel %s not found", label);
+	}
+}
+
 
 static int
 is_unselected_channel(char const * label)
@@ -483,7 +504,7 @@ static int setup_tab_input(mcpanel* panel, int tabid, int nch,
 	if (nch == 0)
 		return 0;
 
-	warn_unexisting_channel(clabels, nch);
+	update_unselected_channel_use(clabels, nch);
 
 	for (i = 0 ; i < nch ; i++) {
 		if (!is_unselected_channel(clabels[i]))
@@ -518,6 +539,7 @@ int Connect(mcpanel* panel)
 	setup_tab_input(panel, 1, grp[0].nch, fs, clabels[0]);
 	setup_tab_input(panel, 2, grp[0].nch, fs, clabels[0]);
 	setup_tab_input(panel, 3, grp[1].nch, fs, clabels[1]);
+	report_unknown_unselected_channels();
 	mcp_define_trigg_input(panel, 16, ntri, fs, clabels[2]);
 
 	pthread_mutex_lock(&sync_mtx);
@@ -820,6 +842,7 @@ static char ** parse_unselected_channels(char const * list)
 	}
 	n++;
 	unselected_labels = malloc((n + 1) * sizeof(*unselected_labels));
+	unselected_found = calloc(n, sizeof(*unselected_found));
 
 	prev = list;
 	for (i = 0 ; i < n ; i++) {
@@ -844,7 +867,9 @@ static void free_unselected_channels(void)
 			free(*c);
 		}
 		free(unselected_labels);
+		free(unselected_found);
 		unselected_labels = NULL;
+		unselected_found = NULL;
 	}
 }
 
